@@ -28,6 +28,16 @@ def test_circuits_sorted_and_versioned():
     assert body["dataset_version"] == "fia-grade1-2026-03-31+f1-2020-2026"
 
 
+def test_circuits_expose_venue_provenance():
+    # The official-preset UI depends on these fields; a stale server
+    # silently breaks it, so pin them at the API level.
+    body = client.get("/api/v1/circuits").json()
+    for c in body["circuits"]:
+        assert "f1_current_2026" in c and "f1_hosted_seasons" in c and "venue_source" in c
+    official = [c["id"] for c in body["circuits"] if c["f1_current_2026"] is True]
+    assert len(official) == 24
+
+
 def test_create_scenario_ok():
     r = client.post("/api/v1/scenarios", json={"race_count": 20, "circuit_ids": IDS[:20]})
     assert r.status_code == 201, r.text

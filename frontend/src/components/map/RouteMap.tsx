@@ -1,12 +1,9 @@
 "use client";
 
-import * as maplibregl from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { DARK_STYLE as STYLE, ensureWorkerUrl, maplibregl } from "@/components/map/maplibre";
 import { greatCirclePoints } from "@/lib/geo";
 import type { HoverTarget, RunPayload } from "@/lib/types";
-
-const STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 
 interface Props {
   run: RunPayload;
@@ -71,6 +68,7 @@ export function RouteMap({ run, hovered }: Props) {
     if (!containerRef.current || mapRef.current) return;
     let map: maplibregl.Map | null = null;
     try {
+      ensureWorkerUrl();
       map = new maplibregl.Map({ container: containerRef.current, style: STYLE, center: [10, 30], zoom: 1.2 });
     } catch (e: unknown) {
       setFailed(e instanceof Error ? e.message : "WebGL unavailable.");
@@ -79,6 +77,7 @@ export function RouteMap({ run, hovered }: Props) {
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl(), "top-right");
     map.on("load", () => {
+      containerRef.current?.setAttribute("data-map-loaded", "true");
       map!.addSource("route", { type: "geojson", data: lines });
       map!.addSource("races", { type: "geojson", data: points });
       map!.addLayer({ id: "route-base", type: "line", source: "route", paint: { "line-color": "#71717a", "line-width": 1.5, "line-opacity": 0.7 } });

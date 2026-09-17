@@ -12,6 +12,12 @@ export interface Circuit {
   timezone: string;
   latitude: number;
   longitude: number;
+  // Provenance enrichment: present on current API payloads; optional so
+  // older/cached payloads never crash the UI (venueLabel degrades to Grade 1).
+  fia_license_grade?: number | null;
+  f1_current_2026?: boolean;
+  f1_hosted_seasons?: number[];
+  venue_source?: string;
 }
 
 export interface ApiError {

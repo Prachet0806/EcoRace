@@ -9,7 +9,7 @@ accents, Giallo Modena highlights, timing-tower results, CARTO dark-matter
 basemap, Archivo display + IBM Plex Mono telemetry numerals via next/font.
 
 No prancing-horse imagery, Scuderia marks, or "Ferrari" naming in UI/copy.
-The tricolore pinstripe is the only flag reference, kept to a 3px bar.
+The red/yellow pinstripe bar is the signature brand accent.
 
 ## Token architecture (enables the future toggle)
 

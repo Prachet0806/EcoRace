@@ -63,6 +63,10 @@ def circuit_list_sorted() -> list[dict]:
                 "timezone": c.timezone,
                 "latitude": c.latitude,
                 "longitude": c.longitude,
+                "fia_license_grade": c.fia_license_grade,
+                "f1_current_2026": c.f1_current_2026,
+                "f1_hosted_seasons": list(c.f1_hosted_seasons),
+                "venue_source": c.venue_source,
             }
             for c in circuits.values()
         ),

@@ -48,7 +48,7 @@ cd C:\Users\prach\Documents\EcoRace\frontend
 
 npm install        # once
 npm test           # vitest unit tests
-npm run dev        # http://localhost:3000/ecorace
+npm run dev        # http://localhost:3000/
 ```
 
 Point the web app at your API (defaults to `http://localhost:8000`):
@@ -61,7 +61,7 @@ Production build check: `npm run typecheck`, then `npm run build`.
 
 ## 4. First optimization (end to end)
 
-**UI:** open http://localhost:3000/ecorace → add 20 tracks → Optimize Calendar
+**UI:** open http://localhost:3000/ → add 20 tracks → Optimize Calendar
 → results page (typical solve: 15–20s).
 
 **API directly** (PowerShell):

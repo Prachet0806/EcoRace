@@ -10,18 +10,23 @@ import type { OptimizeStatus } from "./types";
 export const MIN_RACES = 20;
 export const MAX_RACES = 24;
 
+export type CalendarSource = "custom" | "official-2026-venues";
+
 interface ScenarioState {
   selectedTrackIds: string[];
   raceCount: number;
   seasonYear: number;
+  calendarSource: CalendarSource;
   status: OptimizeStatus;
   errorCode: string | null;
   errorMessage: string | null;
   lastRunId: string | null;
   toggle: (id: string) => void;
   clear: () => void;
+  replaceSelection: (ids: string[]) => void;
   setRaceCount: (n: number) => void;
   setSeasonYear: (y: number) => void;
+  setCalendarSource: (s: CalendarSource) => void;
   setOptimizing: () => void;
   setError: (code: string, message: string) => void;
   setDone: (runId: string) => void;
@@ -40,6 +45,7 @@ export const useScenarioStore = create<ScenarioState>()(
       selectedTrackIds: [],
       raceCount: 20,
       seasonYear: 2026,
+      calendarSource: "custom" as CalendarSource,
       status: "idle",
       errorCode: null,
       errorMessage: null,
@@ -54,6 +60,10 @@ export const useScenarioStore = create<ScenarioState>()(
           errorMessage: null,
         })),
       clear: () => set({ selectedTrackIds: [], status: "idle", errorCode: null, errorMessage: null }),
+      replaceSelection: (ids) =>
+        set({ selectedTrackIds: [...ids], status: "idle", errorCode: null, errorMessage: null }),
+      setCalendarSource: (calendarSource) =>
+        set({ calendarSource, status: "idle", errorCode: null, errorMessage: null }),
       setRaceCount: (n) =>
         set({ raceCount: Math.min(MAX_RACES, Math.max(MIN_RACES, n)), status: "idle", errorCode: null, errorMessage: null }),
       setSeasonYear: (y) => set({ seasonYear: y, status: "idle", errorCode: null, errorMessage: null }),
@@ -62,6 +72,6 @@ export const useScenarioStore = create<ScenarioState>()(
       setDone: (runId) => set({ status: "idle", lastRunId: runId }),
       resetStatus: () => set({ status: "idle", errorCode: null, errorMessage: null }),
     }),
-    { name: "ecorace-scenario", partialize: (s) => ({ selectedTrackIds: s.selectedTrackIds, raceCount: s.raceCount, seasonYear: s.seasonYear }) as ScenarioState },
+    { name: "ecorace-scenario", partialize: (s) => ({ selectedTrackIds: s.selectedTrackIds, raceCount: s.raceCount, seasonYear: s.seasonYear, calendarSource: s.calendarSource }) as ScenarioState },
   ),
 );

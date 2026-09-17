@@ -16,11 +16,11 @@ result: timeline, route map, metrics, and baseline comparison.
 Select tracks → Configure calendar → Optimize → Inspect result
 ```
 
-1. **Builder** (`/ecorace`): two-pane track selector, race count 20–24, season 2025/2026.
+1. **Builder** (`/`): two-pane track selector, race count 20–24, season 2025/2026.
 2. **Optimizer** (FastAPI): CP-SAT + heuristic portfolio minimizing total travel
    distance subject to one-race-per-weekend, max 3 consecutive races + break,
    weather feasibility, and circuit uniqueness.
-3. **Results** (`/ecorace/results/{run_id}`): timeline, MapLibre route, metrics,
+3. **Results** (`/results/{run_id}`): timeline, MapLibre route, metrics,
    baseline comparison, travel legs, constraint diagnostics.
 
 ## Repo map
@@ -34,8 +34,8 @@ backend/src/ecorace/   FastAPI + domain + optimization core
   infrastructure/       JSON reference-data loader
 backend/tests/          pytest suite (29 tests) + benchmark harnesses
 frontend/src/           Next.js (App Router) + Tailwind + zustand + MapLibre
-  app/ecorace/          builder page
-  app/ecorace/results/[runId]/  results page (stub until Phase 4)
+  app/                   builder page (`page.tsx` at root)
+  app/results/[runId]/     results page
   features|components|lib|domain|utils
 data/                   circuits (FIA Grade 1 + F1 2020–2026, 42 venues),
                         season horizons, weather policy, dataset version

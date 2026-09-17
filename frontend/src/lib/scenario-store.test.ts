@@ -30,4 +30,15 @@ describe("scenario store (single source of truth)", () => {
     setRaceCount(22);
     expect(useScenarioStore.getState().raceCount).toBe(22);
   });
+
+  it("replaces the selection and tracks the calendar source", () => {
+    const s = useScenarioStore.getState();
+    s.replaceSelection(["a", "b"]);
+    expect(useScenarioStore.getState().selectedTrackIds).toEqual(["a", "b"]);
+    s.setCalendarSource("official-2026-venues");
+    expect(useScenarioStore.getState().calendarSource).toBe("official-2026-venues");
+    s.setCalendarSource("custom");
+    s.clear();
+    expect(useScenarioStore.getState().selectedTrackIds).toEqual([]);
+  });
 });

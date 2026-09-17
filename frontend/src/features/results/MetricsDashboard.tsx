@@ -6,41 +6,40 @@ function fmt(n: number): string {
   return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
 
-// Metrics + baseline comparison (10 §4): factual deltas only, no composite score.
+// Impact summary: hero metrics with factual baseline deltas only.
+// No composite score — the comparison table states what changed, not why.
 export function MetricsDashboard({ run }: { run: RunPayload }) {
   const m = run.metrics;
   const savingPct =
     m.baseline_distance_km && m.saving_km != null
       ? `${((m.saving_km / m.baseline_distance_km) * 100).toFixed(1)}%`
-      : "—";
+      : null;
   return (
-    <section aria-label="Summary metrics" className="rounded-lg border border-hairline bg-card p-3">
-      <h2 className="mb-2 font-display text-sm font-bold tracking-widest uppercase">Telemetry</h2>
-      <dl className="grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
-        <div className="rounded border border-hairline bg-base p-2">
-          <dt className="text-mute">Optimized distance</dt>
-          <dd className="font-tel text-lg font-semibold">{fmt(m.total_distance_km)} km</dd>
+    <section aria-label="Route impact" className="rounded-lg border border-hairline bg-card p-4">
+      <div className="grid gap-4 text-center md:grid-cols-3">
+        <div>
+          <p className="font-tel text-xs tracking-widest text-mute uppercase">Total distance</p>
+          <p className="font-tel text-3xl font-semibold md:text-4xl">{fmt(m.total_distance_km)} km</p>
+          <p className="mt-1 font-tel text-xs text-mute">
+            {run.calendar.race_count} races · {run.calendar.break_count} breaks
+          </p>
         </div>
-        <div className="rounded border border-hairline bg-base p-2">
-          <dt className="text-mute">Baseline distance</dt>
-          <dd className="font-tel text-lg font-semibold">
+        <div>
+          <p className="font-tel text-xs tracking-widest text-mute uppercase">Baseline</p>
+          <p className="font-tel text-3xl font-semibold text-mute md:text-4xl">
             {m.baseline_distance_km != null ? `${fmt(m.baseline_distance_km)} km` : "infeasible"}
-          </dd>
+          </p>
+          <p className="mt-1 font-tel text-xs text-mute">input order, earliest feasible weekends</p>
         </div>
-        <div className="rounded border border-giallo/40 bg-base p-2">
-          <dt className="text-mute">Saved vs baseline</dt>
-          <dd className="font-tel text-lg font-semibold text-giallo">
-            {m.saving_km != null ? `${fmt(m.saving_km)} km (${savingPct})` : "—"}
-          </dd>
+        <div>
+          <p className="font-tel text-xs tracking-widest text-mute uppercase">Change</p>
+          <p className="font-tel text-3xl font-semibold text-giallo md:text-4xl">
+            {m.saving_km != null ? `−${fmt(m.saving_km)} km` : "—"}
+          </p>
+          <p className="mt-1 font-tel text-xs text-mute">{savingPct != null ? `${savingPct} shorter` : "no baseline"}</p>
         </div>
-        <div className="rounded border border-hairline bg-base p-2">
-          <dt className="text-mute">Races / Breaks / Max streak</dt>
-          <dd className="font-tel text-lg font-semibold">
-            {run.calendar.race_count} / {run.calendar.break_count} / {run.calendar.max_streak}
-          </dd>
-        </div>
-      </dl>
-      <table className="mt-3 w-full font-tel text-sm">
+      </div>
+      <table className="mt-4 w-full font-tel text-sm">
         <caption className="sr-only">Baseline comparison</caption>
         <thead>
           <tr className="text-left text-mute">
@@ -61,6 +60,11 @@ export function MetricsDashboard({ run }: { run: RunPayload }) {
             <td className="py-1">{run.calendar.race_count}</td>
           </tr>
           <tr className="border-t border-hairline">
+            <td className="py-1 pr-2">Max streak</td>
+            <td className="py-1 pr-2">—</td>
+            <td className="py-1">{run.calendar.max_streak}</td>
+          </tr>
+          <tr className="border-t border-hairline">
             <td className="py-1 pr-2">Optimality</td>
             <td className="py-1 pr-2">—</td>
             <td className="py-1">
@@ -70,9 +74,6 @@ export function MetricsDashboard({ run }: { run: RunPayload }) {
           </tr>
         </tbody>
       </table>
-      <p className="mt-2 font-tel text-xs text-mute">
-        Run {run.run_id} · status {run.status} · dataset {run.data_version}
-      </p>
     </section>
   );
 }

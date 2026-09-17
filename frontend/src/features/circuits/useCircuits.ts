@@ -10,9 +10,12 @@ export function useCircuits() {
   const [circuits, setCircuits] = useState<Circuit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setError(null);
     api
       .circuits()
       .then((body) => {
@@ -30,7 +33,7 @@ export function useCircuits() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
-  return { circuits, loading, error };
+  return { circuits, loading, error, retry: () => setAttempt((a) => a + 1) };
 }

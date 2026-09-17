@@ -17,6 +17,12 @@ class Circuit:
     timezone: str
     latitude: float
     longitude: float
+    # Provenance enrichment (UI v2.1 amendment): passed through from data
+    # entries when present; never influences domain invariants or solver.
+    fia_license_grade: int | None = None
+    f1_current_2026: bool = False
+    f1_hosted_seasons: tuple[int, ...] = ()
+    venue_source: str = "fia_grade1"
 
 
 def _entries_from(path: str | Path) -> tuple[list[dict], str]:
@@ -39,6 +45,8 @@ def load_circuits(path: str | Path) -> dict[str, Circuit]:
     known_keys = set(Circuit.__dataclass_fields__)
     for entry in entries:
         core = {k: v for k, v in entry.items() if k in known_keys}
+        if isinstance(core.get("f1_hosted_seasons"), list):
+            core["f1_hosted_seasons"] = tuple(core["f1_hosted_seasons"])
         c = Circuit(**core)
         if c.id in circuits:
             raise ValueError(f"duplicate circuit id: {c.id}")

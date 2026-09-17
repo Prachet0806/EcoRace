@@ -1,20 +1,15 @@
 import { expect, test } from "@playwright/test";
 
-test("map canvas renders with route layers", async ({ page }) => {
-  await page.goto("/ecorace");
+test("map fully loads with route layers", async ({ page }) => {
+  await page.goto("/");
   const addButtons = page.getByRole("button", { name: /^Select / });
   for (let i = 0; i < 20; i++) {
     await addButtons.nth(i).click();
   }
-  await page.getByRole("button", { name: "Optimize Calendar" }).click();
-  await expect(page).toHaveURL(/\/ecorace\/results\/run_/, { timeout: 120_000 });
-  const canvas = page.locator(".maplibregl-canvas");
-  await expect(canvas).toBeVisible({ timeout: 30_000 });
-  // Route + race layers registered on the map.
-  const layers = await page.evaluate(() => {
-    const el = document.querySelector(".maplibregl-canvas");
-    return { canvasPresent: Boolean(el) };
-  });
-  expect(layers.canvasPresent).toBe(true);
+  await page.getByRole("button", { name: "→ Run optimization" }).click();
+  await expect(page).toHaveURL(/\/results\/run_/, { timeout: 120_000 });
+  // Canvas alone is not enough (a stalled map still paints a canvas):
+  // require the style/tiles fully loaded signal.
+  await expect(page.locator('[aria-label="Route map"][data-map-loaded="true"]')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText(/Travel legs \(19\)/)).toBeVisible();
 });
