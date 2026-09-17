@@ -1,0 +1,32 @@
+{
+  "phase": "P0-shape-only",
+  "results": [
+    {
+      "n": 20,
+      "weekends": 40,
+      "feasible_cells": 800,
+      "distance_matrix_min_km": 106.8,
+      "distance_matrix_max_km": 18608.83,
+      "baseline_km": 137698.3,
+      "baseline_ms_p50": 0.71
+    },
+    {
+      "n": 22,
+      "weekends": 40,
+      "feasible_cells": 880,
+      "distance_matrix_min_km": 106.8,
+      "distance_matrix_max_km": 18608.83,
+      "baseline_km": 153023.95,
+      "baseline_ms_p50": 0.94
+    },
+    {
+      "n": 24,
+      "weekends": 40,
+      "feasible_cells": 958,
+      "distance_matrix_min_km": 106.8,
+      "distance_matrix_max_km": 18608.83,
+      "baseline_km": 165280.3,
+      "baseline_ms_p50": 1.25
+    }
+  ]
+}

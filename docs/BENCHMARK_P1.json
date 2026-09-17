@@ -1,0 +1,43 @@
+{
+  "phase": "P1-solver",
+  "config": {
+    "time_limit_s": 5.0,
+    "seeds": [
+      0,
+      1,
+      2
+    ]
+  },
+  "results": [
+    {
+      "n": 20,
+      "status": "feasible_timeout",
+      "wall_ms": 15242,
+      "solver_ms": 5257,
+      "optimality_proven": false,
+      "optimized_km": 48195.93,
+      "baseline_km": 137698.3,
+      "saving_km": 89502.37
+    },
+    {
+      "n": 22,
+      "status": "feasible_timeout",
+      "wall_ms": 15750,
+      "solver_ms": 5276,
+      "optimality_proven": false,
+      "optimized_km": 48674.19,
+      "baseline_km": 153023.95,
+      "saving_km": 104349.76
+    },
+    {
+      "n": 24,
+      "status": "feasible_timeout",
+      "wall_ms": 17142,
+      "solver_ms": 5664,
+      "optimality_proven": false,
+      "optimized_km": 49040.69,
+      "baseline_km": 165280.3,
+      "saving_km": 116239.61
+    }
+  ]
+}

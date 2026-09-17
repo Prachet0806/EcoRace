@@ -1,0 +1,4 @@
+circuits=fia-grade1-2026-03-31+f1-2020-2026 (42 routing venues: 35 Grade 1 + 7 F1-calendar-only; Dubai configs collapsed; zandvoort expiry pending verification)
+weather=weather-v1
+seasons=generator:first-friday-on-or-after-mar1:through-first-friday-with-sunday-on-or-after-dec1
+distance=haversine-R6371.0088-km

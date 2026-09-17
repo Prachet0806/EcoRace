@@ -1,0 +1,44 @@
+# EcoRace Planner — gitignore
+
+# --- Python / backend ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- Node / frontend ---
+node_modules/
+.next/
+out/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# --- Playwright ---
+test-results/
+playwright-report/
+playwright/.cache/
+
+# --- Env & secrets (templates stay tracked) ---
+.env.local
+.env.*.local
+!.env.local.example
+
+# --- OS / editors ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*~
+
+# --- Logs / temp ---
+*.log
+npm-debug.log*

@@ -1,0 +1,10 @@
+{
+  "version": "weather-v1",
+  "policy": { "type": "boolean_feasibility", "note": "Synthetic MVP fixture. All feasible except listed cells, which exist to exercise constraint machinery — not real forecasts." },
+  "feasibility": {
+    "monza": { "2026-03-06": false, "2026-03-13": false },
+    "spa": { "2026-03-06": false },
+    "singapore": { "2026-12-04": false }
+  },
+  "defaults": true
+}
