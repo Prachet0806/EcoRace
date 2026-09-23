@@ -11,7 +11,7 @@ WORKDIR /app
 COPY pyproject.toml ./
 COPY backend/src ./backend/src
 COPY data ./data
-RUN pip install --no-cache-dir "fastapi==0.128.2" "pydantic==2.12.5" "ortools==9.15.6755" "uvicorn==0.40.0" "slowapi==0.1.9" "psutil==7.0.0" "python-json-logger==2.0.7"
+RUN pip install --no-cache-dir "fastapi==0.128.2" "pydantic==2.12.5" "ortools==9.15.6755" "uvicorn==0.40.0" "slowapi==0.1.9" "psutil==7.0.0" "python-json-logger==2.0.7" "numpy>=2.0.2"
 
 VOLUME /app/data
 EXPOSE 8000
