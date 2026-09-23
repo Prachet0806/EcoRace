@@ -4,7 +4,10 @@ import type { RunPayload } from "@/lib/types";
 
 const LABELS: Record<string, string> = {
   weather: "Weather feasibility",
-  max_consecutive_3: "Max 3 consecutive races",
+  max_consecutive: "Consecutive-race limit",
+  summer_break: "Summer break",
+  monthly_minimum: "Monthly coverage",
+  dec_end_pin: "December finale pin",
   race_count_unique: "Race count & uniqueness",
 };
 
@@ -13,8 +16,14 @@ function detailFor(name: string, run: RunPayload): string {
   switch (name) {
     case "weather":
       return `${n} / ${n} assignments feasible`;
-    case "max_consecutive_3":
+    case "max_consecutive":
       return `Maximum observed streak: ${run.calendar.max_streak}`;
+    case "summer_break":
+      return "No races inside the break window";
+    case "monthly_minimum":
+      return "At least one race per month";
+    case "dec_end_pin":
+      return "Finale on the first December weekend";
     case "race_count_unique":
       return `${n} / ${n} unique`;
     default:

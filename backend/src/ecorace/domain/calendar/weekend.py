@@ -65,3 +65,32 @@ def season_weekends(year: int) -> tuple[RaceWeekend, ...]:
         )
         friday += timedelta(days=7)
     return tuple(weekends)
+
+
+def summer_break_weekend_ids(scenario, weekends: tuple[RaceWeekend, ...]) -> frozenset[str]:
+    """Weekend ids covered by the scenario's summer break window.
+
+    Indices are 0-based into the season weekend list and clamped to the
+    horizon, so out-of-range values degrade to the overlap (or empty).
+    """
+    start, end = scenario.summer_break_start, scenario.summer_break_end
+    if start is None or end is None:
+        return frozenset()
+    lo, hi = max(0, start), min(len(weekends) - 1, end)
+    if lo > hi:
+        return frozenset()
+    return frozenset(weekends[i].id for i in range(lo, hi + 1))
+
+
+def covered_months(
+    weekends: tuple[RaceWeekend, ...] | list[RaceWeekend], break_ids: frozenset[str]
+) -> dict[int, list[int]]:
+    """Month (by Friday) -> weekend indices, excluding months touched by the break.
+
+    Every remaining horizon month must host at least one race.
+    """
+    by_month: dict[int, list[int]] = {}
+    for i, w in enumerate(weekends):
+        by_month.setdefault(w.friday.month, []).append(i)
+    break_months = {w.friday.month for w in weekends if w.id in break_ids}
+    return {m: idxs for m, idxs in by_month.items() if m not in break_months}

@@ -11,6 +11,10 @@ class ScenarioRequest(BaseModel):
     race_count: int = Field(ge=1, le=40)
     circuit_ids: list[str] = Field(min_length=1)
     season_year: int = Field(default=2026, ge=2020, le=2030)
+    max_consecutive: int = Field(default=3, ge=2, le=7)
+    summer_break_start: int | None = Field(default=None, ge=0, le=39)
+    summer_break_end: int | None = Field(default=None, ge=0, le=39)
+    pin_end_to_dec_week1: bool = False
     # MVP fixes the remaining knobs; accepted for forward compatibility, ignored.
     constraints: dict = Field(default_factory=dict)
     objective: dict = Field(default_factory=lambda: {"type": "distance"})

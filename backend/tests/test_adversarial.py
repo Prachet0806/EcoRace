@@ -45,5 +45,8 @@ def test_api_determinism_same_seed_same_result():
 
 
 def test_wrong_method_and_unknown_route():
-    assert client.get("/api/v1/optimization/runs").status_code == 405
+    # GET /optimization/runs now returns list of runs (200), not 405
+    r = client.get("/api/v1/optimization/runs")
+    assert r.status_code == 200
+    assert "runs" in r.json()
     assert client.get("/api/v1/nope").status_code == 404

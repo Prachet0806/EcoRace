@@ -55,6 +55,11 @@ def test_scenario_error_codes():
         ({"race_count": 20, "circuit_ids": ["nope"] + IDS[1:20]}, "UNKNOWN_CIRCUIT_ID"),
         ({"race_count": 19, "circuit_ids": IDS[:19]}, "INVALID_RACE_COUNT"),
         ({"race_count": 20, "circuit_ids": IDS[:20], "season_year": 1999}, "INVALID_REQUEST"),
+        ({"race_count": 20, "circuit_ids": IDS[:20], "max_consecutive": 0}, "INVALID_REQUEST"),
+        ({"race_count": 20, "circuit_ids": IDS[:20], "max_consecutive": 1}, "INVALID_REQUEST"),
+        ({"race_count": 20, "circuit_ids": IDS[:20], "max_consecutive": 8}, "INVALID_REQUEST"),
+        ({"race_count": 20, "circuit_ids": IDS[:20], "summer_break_start": 21, "summer_break_end": 19}, "INVALID_SUMMER_BREAK"),
+        ({"race_count": 20, "circuit_ids": IDS[:20], "summer_break_start": 19}, "INVALID_SUMMER_BREAK"),
     ]
     for payload, code in cases:
         r = client.post("/api/v1/scenarios", json=payload)
@@ -89,6 +94,45 @@ def test_run_happy_path_contract():
     # Route geometry sanity: segment endpoints match race order.
     for seg, a, b in zip(body["segments"], cal["races"], cal["races"][1:]):
         assert (seg["from_circuit_id"], seg["to_circuit_id"]) == (a["circuit_id"], b["circuit_id"])
+
+
+def test_run_with_knobs_contract():
+    r = client.post(
+        "/api/v1/optimization/runs",
+        json={
+            "race_count": 20,
+            "circuit_ids": IDS[:20],
+            "budget_s": 9.0,
+            "max_consecutive": 2,
+            "summer_break_start": 19,
+            "summer_break_end": 21,
+            "pin_end_to_dec_week1": True,
+        },
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    cal = body["calendar"]
+    assert cal["max_streak"] <= 2
+    assert cal["races"][-1]["weekend_id"] == "2026-12-04"
+    names = {c["name"] for c in body["constraints"]}
+    assert {"weather", "max_consecutive", "summer_break", "monthly_minimum", "dec_end_pin", "race_count_unique"} <= names
+    assert all(c["satisfied"] for c in body["constraints"])
+
+
+def test_season_weekends_endpoint():
+    r = client.get("/api/v1/seasons/2026/weekends")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["year"] == 2026 and body["count"] == 40
+    assert body["weekends"][0] == {
+        "id": "2026-03-06",
+        "friday": "2026-03-06",
+        "saturday": "2026-03-07",
+        "sunday": "2026-03-08",
+    }
+    r = client.get("/api/v1/seasons/1999/weekends")
+    assert r.status_code == 422
+    assert r.json()["error"]["code"] == "INVALID_HORIZON"
 
 
 def test_run_roundtrip_and_404():

@@ -1,5 +1,7 @@
 # EcoRace Planner
 
+> CI runs backend pytest, frontend typecheck/vitest/build/e2e, and the Docker build on every push and PR — see [.github/workflows/ci.yml](.github/workflows/ci.yml). Add a status badge with your repo slug once pushed to GitHub.
+
 **A decision-support platform for optimizing the F1 calendar for sustainability and logistics efficiency.**
 
 Construct a candidate calendar (20–24 races from 42 real venues), optimize the
@@ -76,6 +78,12 @@ See **[QUICKSTART.md](QUICKSTART.md)** — backend + frontend up in ~5 minutes.
 - Horizon: first Fri–Sun on/after Mar 1 → first Friday whose Sunday covers
   Dec 1 (40 weekends for 2025/2026); weekend ID = Friday date.
 - Exact-match MVP: `len(circuit_ids) == race_count` (20–24).
+- Streak limit configurable `max_consecutive` 2–7 (default 3), enforced with
+  a mandatory break after a full run.
+- Optional summer-break window (0-based weekend indices) excludes weekends
+  from scheduling; optional December-finale pin fixes the last race to Dec W1.
+- Monthly minimum: every horizon month untouched by the summer break hosts
+  at least one race.
 - Weather is a hard `Circuit × Weekend → feasible/infeasible` policy.
 - Distance: Haversine km (`R = 6371.0088`), float end-to-end, rounded only
   for display.

@@ -105,6 +105,25 @@ body {
   background: var(--surface-hover);
 }
 
+/* Strong variant: always-visible Rosso frame, display type, fills on hover. */
+.chamfer-strong {
+  background: linear-gradient(to right, var(--rosso) 0 55%, var(--giallo) 55% 100%);
+}
+.chamfer-btn-strong {
+  padding: 8px 20px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ink-primary);
+  background: var(--surface-card);
+}
+.chamfer-btn-strong:hover {
+  color: #fff;
+  background: var(--rosso);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .speedline-bar {
     animation: none;

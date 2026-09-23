@@ -41,4 +41,26 @@ describe("scenario store (single source of truth)", () => {
     s.clear();
     expect(useScenarioStore.getState().selectedTrackIds).toEqual([]);
   });
+
+  it("clamps the streak limit to 2–7", () => {
+    const { setMaxConsecutive } = useScenarioStore.getState();
+    setMaxConsecutive(99);
+    expect(useScenarioStore.getState().maxConsecutive).toBe(7);
+    setMaxConsecutive(0);
+    expect(useScenarioStore.getState().maxConsecutive).toBe(2);
+    setMaxConsecutive(2);
+    expect(useScenarioStore.getState().maxConsecutive).toBe(2);
+    setMaxConsecutive(3);
+  });
+
+  it("normalizes inverted summer breaks and toggles the finale pin", () => {
+    const s = useScenarioStore.getState();
+    s.setSummerBreak({ start: 21, end: 19 });
+    expect(useScenarioStore.getState().summerBreak).toEqual({ start: 19, end: 21 });
+    s.setSummerBreak(null);
+    expect(useScenarioStore.getState().summerBreak).toBeNull();
+    s.setPinEnd(true);
+    expect(useScenarioStore.getState().pinEnd).toBe(true);
+    s.setPinEnd(false);
+  });
 });

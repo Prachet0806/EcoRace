@@ -2,6 +2,7 @@
 
 import { Pinstripe } from "@/components/ui/Pinstripe";
 import { TopBar } from "@/components/layout/TopBar";
+import { Toaster } from "@/components/ui/Toaster";
 
 interface Props {
   runId?: string;
@@ -24,6 +25,7 @@ export function AppShell({ runId, onBack, children }: Props) {
           reflects the configured feasibility policy, not a forecast.
         </footer>
       </div>
+      <Toaster />
     </div>
   );
 }

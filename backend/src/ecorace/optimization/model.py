@@ -31,6 +31,7 @@ class SolverConfig:
     seeds: tuple[int, ...] = (0, 1, 2)
     num_workers: int = 1  # 1 = deterministic; raise only for speed at cost of reproducibility
     use_hint: bool = True
+    presolve: bool = False
 
 
 @dataclass(frozen=True)

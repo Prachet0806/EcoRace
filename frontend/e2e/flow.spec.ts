@@ -7,7 +7,9 @@ import { expect, test } from "@playwright/test";
 test("optimize button is gated until exact-match selection", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("button", { name: "→ Run optimization" })).toBeDisabled();
-  await expect(page.getByText("Select 20 more tracks (0/20).")).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Optimization command" }).getByText("Select 20 more tracks (0/20)."),
+  ).toBeVisible();
 });
 
 test("keyboard user can select a track", async ({ page }) => {
@@ -26,6 +28,24 @@ test("region filter narrows the available list", async ({ page }) => {
   const after = await items.count();
   expect(after).toBeGreaterThan(0);
   expect(after).toBeLessThan(before);
+});
+
+test("calendar knobs are configurable without running", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("list", { name: "Available tracks" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Fewer consecutive races" }).click();
+  await expect(page.getByRole("group", { name: "Maximum consecutive races" })).toContainText("2");
+
+  // Summer break defaults to August with date-labeled weekends.
+  await expect(page.getByLabel("Summer break start weekend")).toBeVisible();
+  await expect(page.getByLabel("Summer break end weekend")).toBeVisible();
+  await expect(page.getByText(/W\d+ · Aug \d+.*→.*W\d+ · Aug \d+/).first()).toBeVisible();
+  await page.getByRole("button", { name: "On", exact: true }).click();
+  await expect(page.getByLabel("Summer break start weekend")).toHaveCount(0);
+
+  await page.getByLabel("Pin finale to first December week").check();
+  await expect(page.getByLabel("Pin finale to first December week")).toBeChecked();
 });
 
 test("status rail and preview track the selection", async ({ page }) => {
@@ -48,7 +68,7 @@ test("status rail and preview track the selection", async ({ page }) => {
   const firstRunId = page.url().split("/").pop()!;
   await expect(page.getByRole("heading", { name: "Optimized calendar" })).toBeVisible();
   await expect(page.getByText("Total distance")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Calendar" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Calendar", exact: true })).toBeVisible();
   await expect(page.getByText(/Travel legs \(19\)/)).toBeVisible();
   // Map canvas (WebGL) — the component reports failure instead of silently blank.
   await expect(page.locator(".maplibregl-canvas, [role='alert']").first()).toBeVisible({ timeout: 30_000 });
@@ -67,7 +87,7 @@ test("status rail and preview track the selection", async ({ page }) => {
   await expect(page).toHaveURL(/\/results\/run_/, { timeout: 120_000 });
   const secondRunId = page.url().split("/").pop()!;
   expect(secondRunId).not.toBe(firstRunId);
-  await expect(page.getByRole("heading", { name: "Calendar" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Calendar", exact: true })).toBeVisible();
 });
 
 test("official venue set loads the 24-race preset without auto-running", async ({ page }) => {
@@ -88,5 +108,5 @@ test("official venue set loads the 24-race preset without auto-running", async (
   await page.getByRole("button", { name: /Custom calendar/ }).click();
   await expect(page.getByText("Selected (0)").first()).toBeVisible();
   await expect(page).not.toHaveURL(/\/results\/run_/);
-  await expect(page.getByRole("button", { name: "→ Run optimization" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "→ Run optimization" })).toBeDisabled();
 });

@@ -21,6 +21,7 @@ except Exception:  # pragma: no cover
     _ORTOOLS_VERSION = "unknown"
 
 from ecorace.domain.calendar.calendar import Calendar
+from ecorace.domain.calendar.weekend import covered_months, summer_break_weekend_ids
 from ecorace.optimization.model import (
     OptimizationProblem,
     SolveStatus,
@@ -48,6 +49,7 @@ class ORToolsSolver:
         windex_of = {x.id: k for k, x in enumerate(weekends)}
         matrix = build_distance_matrix(problem.circuits, ids)
         meters = [[int(round(matrix[i][j] * 1000)) for j in range(n)] for i in range(n)]
+        break_ids = summer_break_weekend_ids(problem.scenario, problem.weekends)
 
         model = cp_model.CpModel()
         s = [model.NewIntVar(0, n - 1, f"s[{k}]") for k in range(n)]
@@ -55,8 +57,30 @@ class ORToolsSolver:
         model.AddAllDifferent(s)
         for k in range(n - 1):
             model.Add(t[k + 1] >= t[k] + 1)
-        for k in range(n - 3):  # t[k+3]==t[k]+3 <=> 4 consecutive occupied weekends
-            model.Add(t[k + 3] - t[k] >= 4)
+        N = problem.scenario.max_consecutive
+        for k in range(n - N):  # t[k+N]==t[k]+N <=> N+1 consecutive occupied weekends
+            model.Add(t[k + N] - t[k] >= N + 1)
+        if problem.scenario.pin_end_to_dec_week1:
+            model.Add(t[n - 1] == w - 1)
+        # Monthly minimum: every horizon month untouched by the summer break
+        # hosts at least one race. Month index per race via element lookup,
+        # then one BoolOr per month over (race, month) membership vars.
+        # (An earlier per-(race, weekend) reification exploded presolve Probe
+        # to 1.3M+ clauses and stalled first solutions — measured V1.1.)
+        month_of = [weekends[wi].friday.month for wi in range(w)]
+        m = [model.NewIntVar(1, 12, f"m[{k}]") for k in range(n)]
+        for k in range(n):
+            model.AddElement(t[k], month_of, m[k])
+        month_bool_vars: dict[tuple[int, int], object] = {}
+        for month in covered_months(weekends, break_ids):
+            lits = []
+            for k in range(n):
+                c = model.NewBoolVar(f"cov_{month}_{k}")
+                model.Add(m[k] == month).OnlyEnforceIf(c)
+                model.Add(m[k] != month).OnlyEnforceIf(c.Not())
+                lits.append(c)
+                month_bool_vars[(k, month)] = c
+            model.AddBoolOr(lits)
 
         # Weather: post the SMALL side of the feasibility partition (identical
         # semantics on a closed pair universe; keeps the model compact).
@@ -64,7 +88,7 @@ class ORToolsSolver:
             (index_of[c], windex_of[x.id])
             for c in ids
             for x in weekends
-            if problem.weather.is_feasible(c, x.id)
+            if problem.weather.is_feasible(c, x.id) and x.id not in break_ids
         }
         all_pairs = [(ci, wi) for ci in range(n) for wi in range(w)]
         forbidden = [p for p in all_pairs if p not in feasible_set]
@@ -92,24 +116,28 @@ class ORToolsSolver:
         # Consistent hint from the heuristic calendar's time order: k-th race
         # hints BOTH s[k] (its circuit) and t[k] (its weekend). Mixed-source
         # hints are infeasible and poison the search (measured P1).
+        # Completeness matters: monthly membership bools must be hinted too —
+        # partial hints stall first solutions (measured V1.1).
         if config.use_hint and hint_calendar is not None:
             cal_order = [hint_calendar.assignment[x.id] for x in weekends if x.id in hint_calendar.assignment]
             if sorted(cal_order) == sorted(ids):
+                hint_twi = [windex_of[x.id] for x in weekends if x.id in hint_calendar.assignment]
+                hint_months = [weekends[twi].friday.month for twi in hint_twi]
                 for k, cid in enumerate(cal_order):
                     model.AddHint(s[k], index_of[cid])
-                for x in weekends:
-                    if x.id in hint_calendar.assignment:
-                        k = cal_order.index(hint_calendar.assignment[x.id])
-                        model.AddHint(t[k], windex_of[x.id])
+                    model.AddHint(t[k], hint_twi[k])
+                for (k, month), b in month_bool_vars.items():
+                    model.AddHint(b, month == hint_months[k])
 
         solver = cp_model.CpSolver()
         solver.parameters.max_time_in_seconds = max(config.time_limit_s, 0.0)
         solver.parameters.random_seed = config.seed
         solver.parameters.num_search_workers = config.num_workers
-        # Presolve's Probe expands the table/element encoding into 1M+ clauses
-        # and never reaches search within MVP budgets (measured P1). The model
-        # is tight by construction (hint + domain bounds), so solve directly.
-        solver.parameters.cp_model_presolve = False
+        # Presolve OFF by default: Probe can expand table/element encodings
+        # and stall search within small budgets (measured P1). Presolve ON
+        # locks a provided hint almost instantly but improves weakly — the
+        # pipeline portfolios both (first seed ON for safety, rest OFF).
+        solver.parameters.cp_model_presolve = config.presolve
         status = solver.Solve(model)
         runtime_ms = int((time.perf_counter() - t0) * 1000)
 

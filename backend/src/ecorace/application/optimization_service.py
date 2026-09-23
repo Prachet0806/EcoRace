@@ -1,8 +1,7 @@
 """Application orchestration: scenarios + optimization runs.
 
-Owns the use-case flow (load inputs -> validate -> optimize -> present) and
-the MVP in-memory stores. No HTTP, no solver syntax, no SQL here — only
-calls into domain/optimization/infrastructure adapters.
+Owns the use-case flow (load inputs -> validate -> optimize -> present).
+No HTTP, no solver syntax, no SQL here — only calls into domain/optimization/infrastructure adapters.
 """
 from __future__ import annotations
 
@@ -16,16 +15,27 @@ from ecorace.domain.calendar.scenario import (
     ExcessCircuits,
     InsufficientCircuits,
     InvalidRaceCount,
+    InvalidStreakLimit,
+    InvalidSummerBreak,
     Scenario,
     UnknownCircuit,
     validate_scenario,
 )
 from ecorace.infrastructure import data_loader
+from ecorace.infrastructure import persistence
 from ecorace.optimization.model import OptimizationResult, SolveStatus, SolverConfig
 from ecorace.optimization.pipeline import InfeasibleProblem, build_problem, optimize
 from ecorace.optimization.validator import SolutionValidator
 
-_DOMAIN_ERRORS = (InsufficientCircuits, ExcessCircuits, DuplicateCircuit, UnknownCircuit, InvalidRaceCount)
+_DOMAIN_ERRORS = (
+    InsufficientCircuits,
+    ExcessCircuits,
+    DuplicateCircuit,
+    UnknownCircuit,
+    InvalidRaceCount,
+    InvalidStreakLimit,
+    InvalidSummerBreak,
+)
 
 
 @dataclass
@@ -40,22 +50,44 @@ def _domain_error_code(exc: Exception) -> str:
     return getattr(exc, "code", type(exc).__name__)
 
 
-def create_scenario(race_count: int, circuit_ids: list[str], season_year: int) -> dict:
+def create_scenario(
+    race_count: int,
+    circuit_ids: list[str],
+    season_year: int,
+    max_consecutive: int = 3,
+    summer_break_start: int | None = None,
+    summer_break_end: int | None = None,
+    pin_end_to_dec_week1: bool = False,
+) -> dict:
     circuits, _ = data_loader.circuits_bundle()
     weekends = data_loader.season(season_year)
-    scenario = Scenario(race_count=race_count, circuit_ids=tuple(circuit_ids), season_year=season_year)
+    scenario = Scenario(
+        race_count=race_count,
+        circuit_ids=tuple(circuit_ids),
+        season_year=season_year,
+        max_consecutive=max_consecutive,
+        summer_break_start=summer_break_start,
+        summer_break_end=summer_break_end,
+        pin_end_to_dec_week1=pin_end_to_dec_week1,
+    )
     try:
         validate_scenario(scenario, set(circuits))
     except _DOMAIN_ERRORS as e:
         raise AppError(code=_domain_error_code(e), message=str(e), status_code=422) from e
-    return {
+    result = {
         "scenario_id": f"scn_{uuid.uuid4().hex[:12]}",
         "race_count": race_count,
         "circuit_ids": list(circuit_ids),
         "season_year": season_year,
+        "max_consecutive": max_consecutive,
+        "summer_break_start": summer_break_start,
+        "summer_break_end": summer_break_end,
+        "pin_end_to_dec_week1": pin_end_to_dec_week1,
         "weekend_count": len(weekends),
         "horizon": {"start": weekends[0].id, "end": weekends[-1].id},
     }
+    persistence.save_scenario(result)
+    return result
 
 
 def run_optimization(
@@ -64,6 +96,11 @@ def run_optimization(
     season_year: int,
     total_budget_s: float,
     seed: int = 0,
+    scenario_id: str | None = None,
+    max_consecutive: int = 3,
+    summer_break_start: int | None = None,
+    summer_break_end: int | None = None,
+    pin_end_to_dec_week1: bool = False,
 ) -> dict:
     circuits, circuits_tag = data_loader.circuits_bundle()
     weather = data_loader.weather_policy()
@@ -71,7 +108,15 @@ def run_optimization(
         weekends = data_loader.season(season_year)
     except ValueError as e:
         raise AppError(code="INVALID_HORIZON", message=str(e), status_code=422) from e
-    scenario = Scenario(race_count=race_count, circuit_ids=tuple(circuit_ids), season_year=season_year)
+    scenario = Scenario(
+        race_count=race_count,
+        circuit_ids=tuple(circuit_ids),
+        season_year=season_year,
+        max_consecutive=max_consecutive,
+        summer_break_start=summer_break_start,
+        summer_break_end=summer_break_end,
+        pin_end_to_dec_week1=pin_end_to_dec_week1,
+    )
     try:
         problem = build_problem(scenario, circuits, weekends, weather, data_version=circuits_tag)
     except _DOMAIN_ERRORS as e:
@@ -81,7 +126,11 @@ def run_optimization(
 
     per_seed = max(1.0, total_budget_s / 3.0)
     result = optimize(problem, SolverConfig(time_limit_s=per_seed, seed=seed))
-    return present_result(result, scenario, weekends, weather, circuits_tag)
+    run_result = present_result(result, scenario, weekends, weather, circuits_tag)
+    if scenario_id:
+        run_result["scenario_id"] = scenario_id
+    persistence.save_run(run_result)
+    return run_result
 
 
 def present_result(result: OptimizationResult, scenario: Scenario, problem_weekends, weather, circuits_tag: str) -> dict:
@@ -160,7 +209,10 @@ def present_result(result: OptimizationResult, scenario: Scenario, problem_weeke
         },
         "constraints": [
             {"name": "weather", "satisfied": not any(v["code"] == "WEATHER_INFEASIBLE" for v in violations), "violations": [v for v in violations if v["code"] == "WEATHER_INFEASIBLE"]},
-            {"name": "max_consecutive_3", "satisfied": not any(v["code"] == "STREAK_VIOLATION" for v in violations), "violations": [v for v in violations if v["code"] == "STREAK_VIOLATION"]},
+            {"name": "max_consecutive", "satisfied": not any(v["code"] == "STREAK_VIOLATION" for v in violations), "violations": [v for v in violations if v["code"] == "STREAK_VIOLATION"]},
+            {"name": "summer_break", "satisfied": not any(v["code"] == "SUMMER_BREAK_VIOLATION" for v in violations), "violations": [v for v in violations if v["code"] == "SUMMER_BREAK_VIOLATION"]},
+            {"name": "monthly_minimum", "satisfied": not any(v["code"] == "MONTHLY_MINIMUM_VIOLATION" for v in violations), "violations": [v for v in violations if v["code"] == "MONTHLY_MINIMUM_VIOLATION"]},
+            {"name": "dec_end_pin", "satisfied": not any(v["code"] == "DEC_PIN_VIOLATION" for v in violations), "violations": [v for v in violations if v["code"] == "DEC_PIN_VIOLATION"]},
             {"name": "race_count_unique", "satisfied": not any(v["code"] in ("RACE_COUNT_MISMATCH", "DUPLICATE_CIRCUIT", "UNSELECTED_CIRCUIT", "UNKNOWN_WEEKEND") for v in violations), "violations": [v for v in violations if v["code"] in ("RACE_COUNT_MISMATCH", "DUPLICATE_CIRCUIT", "UNSELECTED_CIRCUIT", "UNKNOWN_WEEKEND")]},
         ],
         "solver": {

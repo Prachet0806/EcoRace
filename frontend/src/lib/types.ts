@@ -20,6 +20,19 @@ export interface Circuit {
   venue_source?: string;
 }
 
+export interface SeasonWeekend {
+  id: string;
+  friday: string;
+  saturday: string;
+  sunday: string;
+}
+
+export interface SeasonSchedule {
+  year: number;
+  count: number;
+  weekends: SeasonWeekend[];
+}
+
 export interface ApiError {
   error: {
     code: string;

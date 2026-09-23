@@ -66,3 +66,44 @@ Channeling to the frozen variables: `x[c,w] = 1 ⟺ ∃k: s[k]=c ∧ t[k]=w`,
 `r[w] = Σ_c x[c,w]`. Same feasible set, same objective values — an encoding
 choice, not a model change. `SolutionValidator` checks the extracted
 `Calendar` against constraints 1–5 independently of this encoding.
+
+## V1.1 addendum — calendar knobs (constraints added, objective unchanged)
+
+- **Configurable streak limit** `N ∈ [2,7]` (default 3): `t[k+N] − t[k] ≥ N+1`.
+- **Summer break** (0-based weekend index window, optional): break weekends
+  are removed from the feasible pair universe before the small-side
+  allowed/forbidden table choice.
+- **December finale pin** (optional): `t[N-1] = W−1` (last race on the final
+  horizon weekend, i.e. Dec W1).
+- **Monthly minimum** (always on): every horizon month untouched by the
+  summer break hosts ≥1 race, via reified `t[k] == w` booleans + one
+  `BoolOr` per covered month.
+- Heuristic placement is knob-aware (streak limit, break exclusions, pinned
+  finale, monthly-cover pass); the pipeline only hints validator-clean
+  calendars, since infeasible hints stall first solutions (measured V1.1).
+- Monthly coverage encoding: month index per race via element lookup over
+  the 40-entry weekend→month table, then one `BoolOr` per covered month
+  over `(race, month)` membership vars (~240 reified bools). A per-(race,
+  weekend) reification was tried first and exploded presolve Probe to
+  1.3M+ clauses (measured V1.1).
+- Hint completeness: `s[k]`, `t[k]`, AND monthly membership vars are all
+  hinted. Partial hints (s/t only) never repair within small budgets.
+- Mixed presolve portfolio: the first seed solves WITH presolve (locks a
+  clean hint fast — safety net), remaining seeds WITHOUT (slower first
+  solution, stronger improvement). Keep-best-clean decides. Rationale
+  (measured V1.1): presolve-ON returns hint-quality incumbents but barely
+  improves; presolve-OFF improves well but starts slowly.
+
+## Solver timing with knobs (measured V1.1)
+
+- The monthly-minimum encoding roughly triples first-solution time versus
+  the P1 model (P1 benchmark numbers predate the knobs).
+- At the 30s default budget expect `feasible_timeout`: a validator-clean
+  calendar beating baseline by ~65–70%, with optimality NOT_PROVEN.
+- Small budgets stay viable via the heuristic safety net: the
+  knob-aware heuristic returns a clean calendar in <1s, so short-budget
+  runs degrade to heuristic quality instead of timing out.
+- Proven optimality is not realistic in 30–40s for 20–24 races over 40
+  weekends with monthly coverage; longer budgets improve the incumbent
+  without guaranteeing proof. `feasible_timeout` is the honest terminal
+  status, never presented as optimal.

@@ -1,11 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { CalendarRules } from "@/features/builder/CalendarRules";
+import { firstAugustWeeks, useSeasonWeekends } from "@/features/builder/useSeasonWeekends";
 import { CalendarSourceSelector } from "@/features/builder/CalendarSourceSelector";
 import { OptimizationCommand } from "@/features/builder/OptimizationCommand";
 import { ScenarioHeader } from "@/features/builder/ScenarioHeader";
@@ -36,6 +37,9 @@ export default function EcoRacePage() {
     raceCount,
     seasonYear,
     calendarSource,
+    maxConsecutive,
+    summerBreak,
+    pinEnd,
     status,
     errorCode,
     errorMessage,
@@ -44,10 +48,25 @@ export default function EcoRacePage() {
     replaceSelection,
     setRaceCount,
     setCalendarSource,
+    setMaxConsecutive,
+    setSummerBreak,
+    setPinEnd,
     setOptimizing,
     setError,
     setDone,
   } = useScenarioStore();
+  const { weekends } = useSeasonWeekends(seasonYear);
+
+  // Default summer break: first 3 August weekends, applied once when the
+  // season loads and no explicit choice exists. Turning it off afterwards
+  // sticks for the session.
+  const augustDefaultApplied = useRef(false);
+  useEffect(() => {
+    if (weekends.length === 0 || summerBreak !== null || augustDefaultApplied.current) return;
+    augustDefaultApplied.current = true;
+    const august = firstAugustWeeks(weekends, 3);
+    if (august) setSummerBreak(august);
+  }, [weekends, summerBreak, setSummerBreak]);
 
   const invalid = selectionError(selectedTrackIds.length, raceCount);
   const running = status === "optimizing";
@@ -79,6 +98,10 @@ export default function EcoRacePage() {
           race_count: count,
           circuit_ids: circuitIds,
           season_year: seasonYear,
+          max_consecutive: maxConsecutive,
+          summer_break_start: summerBreak?.start ?? null,
+          summer_break_end: summerBreak?.end ?? null,
+          pin_end_to_dec_week1: pinEnd,
         });
         try {
           sessionStorage.setItem(`ecorace:run:${result.run_id}`, JSON.stringify(result));
@@ -92,7 +115,7 @@ export default function EcoRacePage() {
         else setError("REQUEST_FAILED", e instanceof Error ? e.message : "Optimization request failed.");
       }
     },
-    [seasonYear, router, setDone, setError, setOptimizing],
+    [seasonYear, maxConsecutive, summerBreak, pinEnd, router, setDone, setError, setOptimizing],
   );
 
   const onSourceChange = useCallback(
@@ -196,7 +219,19 @@ export default function EcoRacePage() {
           <RegionDistribution selected={selected} />
         </div>
 
-        <CalendarRules raceCount={raceCount} seasonYear={seasonYear} sourceLocked={sourceLocked} onRaceCount={setRaceCount} />
+        <CalendarRules
+          raceCount={raceCount}
+          seasonYear={seasonYear}
+          sourceLocked={sourceLocked}
+          maxConsecutive={maxConsecutive}
+          summerBreak={summerBreak}
+          pinEnd={pinEnd}
+          weekends={weekends}
+          onRaceCount={setRaceCount}
+          onMaxConsecutive={setMaxConsecutive}
+          onSummerBreak={setSummerBreak}
+          onPinEnd={setPinEnd}
+        />
 
         {status === "error" && (
           <p role="alert" className="rounded border border-rosso p-2 font-tel text-sm">
@@ -208,7 +243,9 @@ export default function EcoRacePage() {
           disabled={invalid !== null || loading || loadError !== null}
           disabledReason={invalid}
           running={running}
-          summary={`${selectedTrackIds.length} circuits · ${seasonYear} · 40 weekends`}
+          summary={`${selectedTrackIds.length} circuits · ${seasonYear} · 40 weekends · max ${maxConsecutive} in a row${
+            summerBreak ? ` · break W${summerBreak.start + 1}–W${summerBreak.end + 1}` : ""
+          }${pinEnd ? " · Dec finale" : ""}`}
           onOptimize={onOptimize}
         />
       </PageContainer>

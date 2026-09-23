@@ -88,11 +88,36 @@ Rules that will reject your request (exact-match MVP):
 | `ModuleNotFoundError: ecorace` | set `$env:PYTHONPATH='backend/src'` from repo root |
 | `UnicodeDecodeError` on circuits | pull latest — loader pins UTF-8; don't edit JSON in ANSI editors |
 | Web shows "Could not load circuits" | API not on `:8000`, or set `NEXT_PUBLIC_ECORACE_API_URL` in `.env.local` + restart `npm run dev` |
-| Solve feels slow | expected: sync budget ≈ `SOLVER_TIMEOUT_SECONDS`; lower `budget_s` per request for faster, slightly worse routes |
+| Solve feels slow | expected: sync budget ≈ `SOLVER_TIMEOUT_SECONDS`; lower `budget_s` per request for faster, slightly worse routes. Calendar knobs (esp. monthly minimum) roughly triple first-solution time vs the bare model |
+| Status `feasible_timeout` | normal, not an error: best validator-clean calendar found within budget, optimality not proven. Typical savings still 65–70% vs baseline; raise the budget for better incumbents, not guaranteed proof |
 | `RUN_NOT_FOUND` after API restart | expected pre-DB: runs live in memory; re-run to get a fresh `run_id` |
 | Port clash | `Get-NetTCPConnection -LocalPort 8000/3000` → stop the owner process |
 
-## 6. What to read next
+## 6. Testing from another device on your LAN (e.g. phone)
+
+The dev servers bind localhost-only settings by default. If you open the
+app via your PC's LAN IP, two things must point at that IP instead:
+
+```powershell
+# Terminal 1 — API: LAN origins are auto-allowlisted (see log line
+# "CORS origins: ..."); just bind all interfaces
+$env:PYTHONPATH = 'backend/src'
+python -m uvicorn ecorace.interface.http.app:app --port 8000 --host 0.0.0.0
+```
+
+```powershell
+# Terminal 2 — web: point the browser at the LAN API, then start
+cd frontend
+$env:NEXT_PUBLIC_ECORACE_API_URL = 'http://10.2.0.2:8000'
+npm run dev
+```
+
+Then open `http://10.2.0.2:3000` on the other device. Replace `10.2.0.2`
+with your PC's LAN IP if it differs. Symptoms if skipped: `OPTIONS … 400`
+in the API log (CORS preflight rejected) and failed `fetch` calls in the
+phone browser (its `localhost` is itself, not your PC).
+
+## 7. What to read next
 
 - `docs/PHASE2_GATE.md` — endpoint + error-code reference
 - `docs/FORMULATION.md` — the frozen optimization model (+ measured solver notes)

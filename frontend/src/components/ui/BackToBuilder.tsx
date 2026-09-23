@@ -9,8 +9,8 @@ interface Props {
 // TopBar and results page stay identical. Accessible name preserved.
 export function BackToBuilder({ onClick, label = "← Back to scenario builder" }: Props) {
   return (
-    <span className="chamfer-wrap">
-      <button type="button" onClick={onClick} className="chamfer-btn">
+    <span className="chamfer-wrap chamfer-strong">
+      <button type="button" onClick={onClick} className="chamfer-btn chamfer-btn-strong">
         {label}
       </button>
     </span>

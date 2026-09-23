@@ -13,7 +13,7 @@ from __future__ import annotations
 from ecorace.analytics.baseline import BaselineInfeasible, build_baseline
 from ecorace.domain.calendar.calendar import Calendar
 from ecorace.domain.calendar.scenario import Scenario, validate_scenario
-from ecorace.domain.calendar.weekend import RaceWeekend
+from ecorace.domain.calendar.weekend import RaceWeekend, summer_break_weekend_ids
 from ecorace.domain.circuit.models import Circuit
 from ecorace.domain.constraints.weather import WeatherPolicy
 from ecorace.optimization.heuristics import HeuristicSolver
@@ -40,7 +40,21 @@ def build_problem(
     data_version: str = "unknown",
 ) -> OptimizationProblem:
     validate_scenario(scenario, set(circuits))
-    blocked = [c for c in scenario.circuit_ids if not any(weather.is_feasible(c, w.id) for w in weekends)]
+    break_ids = summer_break_weekend_ids(scenario, weekends)
+    if scenario.summer_break_start is not None and not break_ids:
+        raise InfeasibleProblem("summer break window covers no horizon weekend")
+    open_ids = [w.id for w in weekends if w.id not in break_ids]
+    if len(open_ids) < scenario.race_count:
+        raise InfeasibleProblem(
+            f"only {len(open_ids)} weekends outside the summer break for {scenario.race_count} races"
+        )
+    if scenario.pin_end_to_dec_week1 and weekends[-1].id in break_ids:
+        raise InfeasibleProblem("pinned finale falls inside the summer break window")
+    blocked = [
+        c
+        for c in scenario.circuit_ids
+        if not any(weather.is_feasible(c, w.id) for w in weekends if w.id not in break_ids)
+    ]
     if blocked:
         raise InfeasibleProblem(f"no feasible weekend for: {blocked}")
     return OptimizationProblem(
@@ -55,7 +69,14 @@ def race_order(calendar: Calendar) -> list[str]:
 
 def _baseline_km(problem: OptimizationProblem) -> tuple[float | None, str]:
     try:
-        cal = build_baseline(list(problem.scenario.circuit_ids), list(problem.weekends), problem.weather)
+        cal = build_baseline(
+            list(problem.scenario.circuit_ids),
+            list(problem.weekends),
+            problem.weather,
+            max_consecutive=problem.scenario.max_consecutive,
+            forbidden_ids=summer_break_weekend_ids(problem.scenario, problem.weekends),
+            last_weekend_id=problem.weekends[-1].id if problem.scenario.pin_end_to_dec_week1 else None,
+        )
     except BaselineInfeasible:
         return None, "infeasible"  # never blocks optimization, per contract
     return order_distance_km(race_order(cal), problem.circuits), "ok"
@@ -71,21 +92,36 @@ def optimize(problem: OptimizationProblem, config: SolverConfig = SolverConfig()
     else:
         h_meta = h_out[1]
 
+    # Hint only with fully validator-clean calendars. A hint violating any
+    # hard constraint (streak, break, pin, monthly cover) poisons CP-SAT
+    # hint-repair and stalls first solutions (measured V1.1).
+    hint_cal = (
+        h_cal
+        if h_cal is not None
+        and not SolutionValidator.validate(h_cal, problem.scenario, problem.weekends, problem.weather)
+        else None
+    )
+
     o_cal, o_meta, last_meta = None, None, None
     attempts: list[dict] = []
     best_km = float("inf")
     # Deterministic portfolio: CP-SAT solution quality is not monotone in the
     # time limit (measured P1: 30s runs worse than 5s at same seed), so run the
     # fixed seed schedule and keep the best validator-clean calendar.
-    for s in config.seeds or (config.seed,):
+    for idx, s in enumerate(config.seeds or (config.seed,)):
         seed_cfg = SolverConfig(
             time_limit_s=config.time_limit_s,
             seed=s,
             seeds=(s,),
             num_workers=config.num_workers,
             use_hint=config.use_hint,
+            # First seed solves WITH presolve: locks the clean hint almost
+            # instantly (safety net). Remaining seeds solve WITHOUT presolve:
+            # slower first solution, stronger improvement. Keep-best decides.
+            # (Measured V1.1 against the monthly-minimum encoding.)
+            presolve=(idx == 0),
         )
-        cal_s, meta_s = ORToolsSolver().solve(problem, seed_cfg, hint_calendar=h_cal)
+        cal_s, meta_s = ORToolsSolver().solve(problem, seed_cfg, hint_calendar=hint_cal)
         last_meta = meta_s
         km_s = None
         if cal_s is not None and not SolutionValidator.validate(cal_s, problem.scenario, problem.weekends, problem.weather):
