@@ -1,7 +1,5 @@
 # EcoRace Planner
 
-> CI runs backend pytest, frontend typecheck/vitest/build/e2e, and the Docker build on every push and PR — see [.github/workflows/ci.yml](.github/workflows/ci.yml). Add a status badge with your repo slug once pushed to GitHub.
-
 **A decision-support platform for optimizing the F1 calendar for sustainability and logistics efficiency.**
 
 Construct a candidate calendar (20–24 races from 42 real venues), optimize the
