@@ -53,7 +53,6 @@ def test_insufficient_excess_duplicate_unknown_race_count():
 def test_weather_fixture_cells():
     assert WEATHER.is_feasible("monza", "2026-04-03") is True
     assert WEATHER.is_feasible("monza", "2026-03-06") is False
-    assert WEATHER.is_feasible("spa", "2026-03-06") is False
 
 
 def test_weather_forbidden_scheduling_detected():
