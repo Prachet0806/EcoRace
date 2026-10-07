@@ -8,7 +8,11 @@ from __future__ import annotations
 
 from ecorace.domain.calendar.calendar import Calendar
 from ecorace.domain.calendar.scenario import Scenario
-from ecorace.domain.calendar.weekend import RaceWeekend, covered_months, summer_break_weekend_ids
+from ecorace.domain.calendar.weekend import (
+    RaceWeekend,
+    covered_months,
+    summer_break_weekend_ids,
+)
 from ecorace.domain.constraints.weather import WeatherPolicy
 from ecorace.optimization.model import Violation
 

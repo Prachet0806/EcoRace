@@ -10,12 +10,43 @@ function fmt(n: number): string {
 // No composite score — the comparison table states what changed, not why.
 export function MetricsDashboard({ run }: { run: RunPayload }) {
   const m = run.metrics;
+  const baselineStatus = m.baseline_status ?? "ok";
+  const baselineComparable = baselineStatus === "ok";
+  const saving = m.saving_km;
+  const isRegression = saving != null && saving < -1e-6;
+  const isImprovement = saving != null && saving > 1e-6;
   const savingPct =
-    m.baseline_distance_km && m.saving_km != null
-      ? `${((m.saving_km / m.baseline_distance_km) * 100).toFixed(1)}%`
+    m.baseline_distance_km && saving != null
+      ? `${Math.abs((saving / m.baseline_distance_km) * 100).toFixed(1)}%`
       : null;
+  // Guardrail: never render a double negative ("−−33k") and never call a
+  // regression "shorter". A negative saving means optimized is LONGER.
+  const changeLabel =
+    saving == null ? "—" : isRegression ? `+${fmt(Math.abs(saving))} km` : `−${fmt(Math.abs(saving))} km`;
+  const changeCaption =
+    saving == null
+      ? "no baseline"
+      : savingPct == null
+        ? "—"
+        : isRegression
+          ? `${savingPct} longer`
+          : isImprovement
+            ? `${savingPct} shorter`
+            : "equal";
   return (
     <section aria-label="Route impact" className="rounded-lg border border-hairline bg-card p-4">
+      {!baselineComparable && m.baseline_distance_km != null ? (
+        <p className="mb-3 rounded border border-hairline px-2 py-1 font-tel text-xs text-mute">
+          Baseline is a reference only — it violates {baselineStatus.replace("non_comparable:", "")} so a
+          fully-constrained calendar can legitimately be longer.
+        </p>
+      ) : null}
+      {isRegression && baselineComparable ? (
+        <p className="mb-3 rounded border border-rosso px-2 py-1 font-tel text-xs text-rosso">
+          Regression guardrail tripped: optimized is longer than a comparable baseline. This should not happen —
+          please report the run id.
+        </p>
+      ) : null}
       <div className="grid gap-4 text-center md:grid-cols-3">
         <div>
           <p className="font-tel text-xs tracking-widest text-mute uppercase">Total distance</p>
@@ -33,10 +64,12 @@ export function MetricsDashboard({ run }: { run: RunPayload }) {
         </div>
         <div>
           <p className="font-tel text-xs tracking-widest text-mute uppercase">Change</p>
-          <p className="font-tel text-3xl font-semibold text-giallo md:text-4xl">
-            {m.saving_km != null ? `−${fmt(m.saving_km)} km` : "—"}
+          <p
+            className={`font-tel text-3xl font-semibold md:text-4xl ${isRegression ? "text-rosso" : "text-giallo"}`}
+          >
+            {changeLabel}
           </p>
-          <p className="mt-1 font-tel text-xs text-mute">{savingPct != null ? `${savingPct} shorter` : "no baseline"}</p>
+          <p className="mt-1 font-tel text-xs text-mute">{changeCaption}</p>
         </div>
       </div>
       <table className="mt-4 w-full font-tel text-sm">

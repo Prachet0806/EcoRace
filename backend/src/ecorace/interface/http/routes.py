@@ -1,14 +1,13 @@
 """HTTP routes. Parsing + status mapping only — no domain/solver logic."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Query, Request
-from slowapi import Limiter
-
 from ecorace.application import optimization_service as svc
 from ecorace.infrastructure import data_loader, persistence
 from ecorace.interface.http.errors import envelope
 from ecorace.interface.http.schemas import RunRequest, ScenarioRequest
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
+from slowapi import Limiter
 
 try:
     import psutil

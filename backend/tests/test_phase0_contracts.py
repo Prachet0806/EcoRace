@@ -2,7 +2,6 @@
 from pathlib import Path
 
 import pytest
-
 from ecorace.analytics.baseline import BaselineInfeasible, build_baseline
 from ecorace.analytics.distance import haversine_km
 from ecorace.domain.calendar.calendar import Calendar

@@ -20,8 +20,9 @@ from ecorace.optimization.heuristics import HeuristicSolver
 from ecorace.optimization.model import (
     OptimizationProblem,
     OptimizationResult,
-    SolveStatus,
     SolverConfig,
+    SolverMetadata,
+    SolveStatus,
     order_distance_km,
 )
 from ecorace.optimization.ortools_solver import ORToolsSolver
@@ -67,7 +68,20 @@ def race_order(calendar: Calendar) -> list[str]:
     return [calendar.assignment[wid] for wid in sorted(calendar.assignment, key=weekend_pos.__getitem__)]
 
 
-def _baseline_km(problem: OptimizationProblem) -> tuple[float | None, str]:
+def _baseline_calendar(
+    problem: OptimizationProblem,
+) -> tuple[Calendar | None, float | None, str]:
+    """Greedy input-order baseline plus validator verdict.
+
+    The greedy baseline ignores the monthly-minimum rule by construction,
+    so it is often validator-dirty. It must never be presented as a
+    comparable "ok" baseline in that case — otherwise a fully-constrained
+    optimized calendar looks like a regression (e.g. 139k vs 105k km).
+    Returns (calendar_or_none, km_or_none, status).
+    Status is "ok" only when the baseline is fully validator-clean and
+    therefore a fair comparison; otherwise "infeasible" (greedy failed) or
+    "non_comparable:<CODES>" (greedy built but violates hard constraints).
+    """
     try:
         cal = build_baseline(
             list(problem.scenario.circuit_ids),
@@ -78,17 +92,28 @@ def _baseline_km(problem: OptimizationProblem) -> tuple[float | None, str]:
             last_weekend_id=problem.weekends[-1].id if problem.scenario.pin_end_to_dec_week1 else None,
         )
     except BaselineInfeasible:
-        return None, "infeasible"  # never blocks optimization, per contract
-    return order_distance_km(race_order(cal), problem.circuits), "ok"
+        return None, None, "infeasible"  # never blocks optimization, per contract
+    km = order_distance_km(race_order(cal), problem.circuits)
+    violations = SolutionValidator.validate(cal, problem.scenario, problem.weekends, problem.weather)
+    if violations:
+        codes = sorted({v.code for v in violations})
+        return cal, km, f"non_comparable:{'+'.join(codes)}"
+    return cal, km, "ok"
+
+
+def _baseline_km(problem: OptimizationProblem) -> tuple[float | None, str]:
+    _, km, status = _baseline_calendar(problem)
+    return km, status
 
 
 def optimize(problem: OptimizationProblem, config: SolverConfig = SolverConfig()) -> OptimizationResult:
-    baseline_km, baseline_status = _baseline_km(problem)
+    baseline_cal, baseline_km, baseline_status = _baseline_calendar(problem)
 
-    h_cal, h_order, h_meta = None, None, None
+    h_cal, h_meta = None, None
     h_out = HeuristicSolver().solve(problem, config)
     if h_out[0] is not None:
-        (h_cal, h_order), h_meta = h_out
+        h_cal, _ = h_out[0]
+        h_meta = h_out[1]
     else:
         h_meta = h_out[1]
 
@@ -142,15 +167,35 @@ def optimize(problem: OptimizationProblem, config: SolverConfig = SolverConfig()
 
     # Best validator-clean calendar wins, regardless of origin. Never prefer a
     # worse solver solution over a better heuristic one (or vice versa).
+    # Guardrail: a validator-clean baseline is itself a candidate
+    # (origin="baseline"), so optimized can never regress vs a comparable
+    # baseline. A dirty baseline (usual case: monthly-minimum violation) is
+    # NOT a candidate and stays flagged non_comparable in diagnostics.
     best: tuple[Calendar, SolverMetadata, SolveStatus, str] | None = None
+    best_km = float("inf")
+    if baseline_cal is not None and baseline_status == "ok" and baseline_km is not None:
+        baseline_meta = SolverMetadata(
+            solver_name="baseline",
+            solver_version="greedy-v1",
+            seed=config.seed,
+            runtime_ms=0,
+            time_limit_s=0.0,
+            status=SolveStatus.FEASIBLE,
+            objective_km=baseline_km,
+            data_version=problem.data_version,
+        )
+        best = (baseline_cal, baseline_meta, SolveStatus.FEASIBLE, "baseline")
+        best_km = baseline_km
     if h_cal is not None:
         h_viol = SolutionValidator.validate(h_cal, problem.scenario, problem.weekends, problem.weather)
         if not h_viol:
-            best = (h_cal, h_meta, SolveStatus.FEASIBLE, "heuristic")
+            h_km = order_distance_km(race_order(h_cal), problem.circuits)
+            if h_km < best_km:
+                best = (h_cal, h_meta, SolveStatus.FEASIBLE, "heuristic")
+                best_km = h_km
     if o_cal is not None:
         o_km = order_distance_km(race_order(o_cal), problem.circuits)
-        h_km = order_distance_km(race_order(best[0]), problem.circuits) if best else float("inf")
-        if o_km <= h_km:
+        if o_km < best_km:
             o_status = (
                 SolveStatus.FEASIBLE_OPTIMAL
                 if o_meta.status == SolveStatus.FEASIBLE_OPTIMAL
@@ -159,6 +204,7 @@ def optimize(problem: OptimizationProblem, config: SolverConfig = SolverConfig()
                 else SolveStatus.FEASIBLE
             )
             best = (o_cal, o_meta, o_status, "ortools")
+            best_km = o_km
         elif best is not None and o_meta.status == SolveStatus.INFEASIBLE:
             diagnostics["solver_disagreement"] = True
 

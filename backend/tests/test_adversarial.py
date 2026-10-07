@@ -1,8 +1,7 @@
 """P5 adversarial cases: hostile/edge inputs fail typed, never fake-valid."""
-from fastapi.testclient import TestClient
-
 from ecorace.infrastructure import data_loader
 from ecorace.interface.http.app import create_app
+from fastapi.testclient import TestClient
 
 app = create_app()
 client = TestClient(app)

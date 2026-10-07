@@ -25,11 +25,6 @@ def data_dir() -> Path:
 
 
 @lru_cache(maxsize=1)
-def dataset_version() -> str:
-    return (data_dir() / "DATASET_VERSION").read_text(encoding="utf-8").strip()
-
-
-@lru_cache(maxsize=1)
 def circuits_bundle() -> tuple[dict, str]:
     """Return (circuits dict, circuits dataset version tag)."""
     circuits = load_circuits(data_dir() / "circuits.json")

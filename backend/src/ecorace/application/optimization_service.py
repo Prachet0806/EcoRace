@@ -21,9 +21,8 @@ from ecorace.domain.calendar.scenario import (
     UnknownCircuit,
     validate_scenario,
 )
-from ecorace.infrastructure import data_loader
-from ecorace.infrastructure import persistence
-from ecorace.optimization.model import OptimizationResult, SolveStatus, SolverConfig
+from ecorace.infrastructure import data_loader, persistence
+from ecorace.optimization.model import OptimizationResult, SolverConfig, SolveStatus
 from ecorace.optimization.pipeline import InfeasibleProblem, build_problem, optimize
 from ecorace.optimization.validator import SolutionValidator
 

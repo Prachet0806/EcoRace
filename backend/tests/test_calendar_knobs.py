@@ -2,7 +2,6 @@
 from pathlib import Path
 
 import pytest
-
 from ecorace.analytics.baseline import build_baseline
 from ecorace.domain.calendar.calendar import Calendar
 from ecorace.domain.calendar.scenario import (
@@ -14,7 +13,7 @@ from ecorace.domain.calendar.scenario import (
 from ecorace.domain.calendar.weekend import season_weekends, summer_break_weekend_ids
 from ecorace.domain.circuit.models import load_circuit_ids, load_circuits
 from ecorace.domain.constraints.weather import WeatherPolicy
-from ecorace.optimization.model import SolveStatus, SolverConfig
+from ecorace.optimization.model import SolverConfig, SolveStatus
 from ecorace.optimization.pipeline import build_problem, optimize
 from ecorace.optimization.validator import SolutionValidator
 

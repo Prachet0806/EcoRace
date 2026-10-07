@@ -6,18 +6,22 @@ from __future__ import annotations
 
 import time
 
-from ecorace.analytics.baseline import BaselineInfeasible, build_baseline, would_break_streak
+from ecorace.analytics.baseline import (
+    BaselineInfeasible,
+    build_baseline,
+    would_break_streak,
+)
 from ecorace.domain.calendar.calendar import Calendar
 from ecorace.domain.calendar.weekend import covered_months, summer_break_weekend_ids
-from ecorace.optimization.validator import SolutionValidator
 from ecorace.optimization.model import (
     OptimizationProblem,
-    SolveStatus,
     SolverConfig,
     SolverMetadata,
+    SolveStatus,
     build_distance_matrix,
     order_distance_km,
 )
+from ecorace.optimization.validator import SolutionValidator
 
 
 def nearest_neighbor(order_ids: list[str], matrix: list[list[float]], start: int) -> list[int]:
@@ -85,7 +89,6 @@ def place_with_monthly_cover(
             return True
         return False
 
-    it = None
     reserve_last = order[-1] if last_weekend_id else None
     placeable = order[:-1] if last_weekend_id else order
     if len(placeable) < len(covered):

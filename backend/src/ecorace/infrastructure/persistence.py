@@ -154,12 +154,3 @@ def list_runs(
         params.extend([limit, offset])
         rows = conn.execute(sql, params).fetchall()
         return [_run_from_row(r) for r in rows]
-
-
-def delete_old_runs(retention_days: int = 30) -> int:
-    with get_conn() as conn:
-        cur = conn.execute(
-            "DELETE FROM runs WHERE created_at < datetime('now', ?)", (f"-{retention_days} days",)
-        )
-        conn.commit()
-        return cur.rowcount

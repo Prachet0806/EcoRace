@@ -24,9 +24,9 @@ from ecorace.domain.calendar.calendar import Calendar
 from ecorace.domain.calendar.weekend import covered_months, summer_break_weekend_ids
 from ecorace.optimization.model import (
     OptimizationProblem,
-    SolveStatus,
     SolverConfig,
     SolverMetadata,
+    SolveStatus,
     build_distance_matrix,
 )
 

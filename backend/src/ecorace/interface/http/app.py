@@ -24,19 +24,22 @@ import logging
 import os
 import socket
 
+from ecorace.application.optimization_service import AppError
+from ecorace.infrastructure import persistence
+from ecorace.interface.http.errors import (
+    app_error_handler,
+    internal_error_handler,
+    validation_handler,
+)
+from ecorace.interface.http.logging import request_id_middleware, setup_logging
+from ecorace.interface.http.routes import init_rate_limits, router
+from ecorace.optimization.circuit_breaker import CircuitBreaker
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
-
-from ecorace.application.optimization_service import AppError
-from ecorace.interface.http.errors import app_error_handler, validation_handler, internal_error_handler
-from ecorace.interface.http.logging import request_id_middleware, setup_logging
-from ecorace.interface.http.routes import router, init_rate_limits
-from ecorace.infrastructure import persistence
-from ecorace.optimization.circuit_breaker import CircuitBreaker
 
 
 def _lan_origins() -> list[str]:

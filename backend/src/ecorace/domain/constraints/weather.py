@@ -15,7 +15,7 @@ class WeatherPolicy:
         return self._feasibility.get(circuit_id, {}).get(weekend_id, self._default)
 
     @classmethod
-    def from_json(cls, path: str | Path) -> "WeatherPolicy":
+    def from_json(cls, path: str | Path) -> WeatherPolicy:
         raw = json.loads(Path(path).read_text(encoding="utf-8"))
         feasibility = raw.get("feasibility", {})
         return cls(version=raw.get("version", "unknown"), feasibility=feasibility, default=raw.get("defaults", True))

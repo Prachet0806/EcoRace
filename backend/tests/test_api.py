@@ -1,14 +1,12 @@
 """P2 gate: HTTP integration, stable error codes, response contracts, CORS."""
-from fastapi.testclient import TestClient
-
 from ecorace.infrastructure import data_loader
 from ecorace.interface.http.app import create_app
+from fastapi.testclient import TestClient
 
 app = create_app()
 client = TestClient(app)
 
 IDS = [c["id"] for c in data_loader.circuit_list_sorted()]
-BY_ID = {c["id"]: c for c in data_loader.circuit_list_sorted()}
 
 
 def test_health():

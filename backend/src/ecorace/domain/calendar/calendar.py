@@ -5,17 +5,11 @@ from dataclasses import dataclass
 
 from ecorace.domain.calendar.weekend import RaceWeekend
 
-MAX_CONSECUTIVE = 3
-
 
 @dataclass(frozen=True)
 class Calendar:
     weekends: tuple[RaceWeekend, ...]
     assignment: dict[str, str]  # weekend_id -> circuit_id (absent = break)
-
-    def race_weekend_ids(self) -> list[str]:
-        ids = [w.id for w in self.weekends if w.id in self.assignment]
-        return sorted(ids)
 
     def race_count(self) -> int:
         return len(self.assignment)

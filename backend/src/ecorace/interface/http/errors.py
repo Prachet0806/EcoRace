@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import time
-from fastapi import Request
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
 
 from ecorace.application.optimization_service import AppError
 from ecorace.interface.http.logging import request_id_var
+from fastapi import Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 
 def envelope(code: str, message: str, details: list[dict] | list = []) -> dict:

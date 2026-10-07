@@ -1,0 +1,9 @@
+# Keep the image free of local/runtime artifacts.
+# Context is the repo root (Dockerfile lives at backend/Dockerfile).
+*.db
+**/*.db
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+frontend/node_modules/
+frontend/.next/

@@ -7,7 +7,7 @@ from ecorace.domain.calendar.weekend import season_weekends
 from ecorace.domain.circuit.models import load_circuit_ids, load_circuits
 from ecorace.domain.constraints.weather import WeatherPolicy
 from ecorace.optimization.heuristics import HeuristicSolver
-from ecorace.optimization.model import SolveStatus, SolverConfig
+from ecorace.optimization.model import SolverConfig, SolveStatus
 from ecorace.optimization.pipeline import build_problem, optimize
 from ecorace.optimization.validator import SolutionValidator
 
@@ -35,8 +35,22 @@ def test_pipeline_feasible_and_beats_baseline():
         assert res.status in (SolveStatus.FEASIBLE_OPTIMAL, SolveStatus.FEASIBLE, SolveStatus.FEASIBLE_TIMEOUT), (n, res.status)
         assert res.calendar is not None and res.total_distance_km is not None
         assert res.baseline_distance_km is not None
-        assert res.total_distance_km <= res.baseline_distance_km + 1e-6
+        # Guardrail: optimized must never regress vs a COMPARABLE baseline.
+        # A non_comparable baseline (e.g. monthly-minimum violation) is a
+        # reference lower bound, so no <= assertion applies to it.
+        if res.diagnostics.get("baseline_status") == "ok":
+            assert res.total_distance_km <= res.baseline_distance_km + 1e-6
+            assert res.diagnostics.get("origin") in ("baseline", "heuristic", "ortools")
+        else:
+            assert res.diagnostics.get("baseline_status", "").startswith(("non_comparable", "infeasible"))
         assert SolutionValidator.validate(res.calendar, res.calendar and _problem(n).scenario, WEEKENDS, WEATHER) == ()
+
+
+def test_baseline_status_flags_monthly_violation():
+    # Greedy input-order baseline packs early weekends and skips the
+    # monthly-minimum rule, so its status must NOT be reported as "ok".
+    res = optimize(_problem(20), CONFIG)
+    assert res.diagnostics.get("baseline_status", "").startswith("non_comparable:MONTHLY_MINIMUM_VIOLATION")
 
 
 def test_all_assignments_weather_feasible_and_streak_ok():
