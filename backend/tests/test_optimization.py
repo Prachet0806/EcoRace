@@ -6,8 +6,13 @@ from ecorace.domain.calendar.scenario import Scenario
 from ecorace.domain.calendar.weekend import season_weekends
 from ecorace.domain.circuit.models import load_circuit_ids, load_circuits
 from ecorace.domain.constraints.weather import WeatherPolicy
-from ecorace.optimization.heuristics import HeuristicSolver
-from ecorace.optimization.model import SolverConfig, SolveStatus
+from ecorace.optimization.heuristics import (
+    HeuristicSolver,
+    nearest_neighbor,
+    place_with_monthly_cover,
+    two_opt,
+)
+from ecorace.optimization.model import SolverConfig, SolveStatus, build_distance_matrix, order_distance_km
 from ecorace.optimization.pipeline import build_problem, optimize
 from ecorace.optimization.validator import SolutionValidator
 
@@ -123,3 +128,20 @@ def test_horizon_edge_triple_at_end_valid():
     cal = Calendar(weekends=WEEKENDS, assignment={w[-3].id: "a", w[-2].id: "b", w[-1].id: "c"})
     assert cal.streak_violations() == []  # no following weekend: break rule vacuous at edge
     assert cal.max_streak() == 3
+
+
+def test_monthly_cover_preserves_tour_locality():
+    # Regression: scattering the TSP tour head one-per-month across the
+    # season more than doubled routed distance (122,820 km placed vs a
+    # ~50,000 km tour on 24 races). Contiguous chunks per covered month
+    # must keep placed distance near the input tour distance.
+    order = IDS[:24]
+    matrix = build_distance_matrix(CIRCUITS, order)
+    tour = [order[i] for i in two_opt(nearest_neighbor(order, matrix, 0), matrix)]
+    tour_km = order_distance_km(tour, CIRCUITS)
+    cal = place_with_monthly_cover(tour, list(WEEKENDS), WEATHER, 3, frozenset(), None)
+    placed = [cal.assignment[w.id] for w in WEEKENDS if w.id in cal.assignment]
+    assert placed != []
+    assert order_distance_km(placed, CIRCUITS) <= tour_km * 1.05
+    scen = Scenario(race_count=24, circuit_ids=tuple(order), season_year=2026)
+    assert SolutionValidator.validate(cal, scen, WEEKENDS, WEATHER) == ()

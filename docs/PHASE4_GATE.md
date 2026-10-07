@@ -27,7 +27,7 @@ changes (one live-run observation below, no action needed).
   sync both directions via race_id/segment_id (race↔markers+adjacent legs,
   leg↔segment+endpoint races); keyed by run_id for fresh sources.
 - TravelLegs: seg ids, endpoint names, km, hover sync.
-- ConstraintDiagnostics: per-constraint ✓/✗ + violation detail.
+- ConstraintDiagnostics: per-constraint pass/fail + violation detail.
 - Back action returns to `/ecorace`; draft survives via zustand persist.
 - Limitations footer on every result (approximation/policy disclaimer).
 

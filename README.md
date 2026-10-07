@@ -2,6 +2,8 @@
 
 **A decision-support platform for optimizing the F1 calendar for sustainability and logistics efficiency.**
 
+**Live demo: https://eco-race-two.vercel.app/**
+
 Construct a candidate calendar (20–24 races from 42 real venues), optimize the
 travel route under hard scheduling and weather constraints, and inspect the
 result: timeline, route map, metrics, and baseline comparison.
@@ -60,12 +62,12 @@ around the domain + optimization core. Forbidden directions (`domain → FastAPI
 
 | Phase | State |
 |---|---|
-| 0 — Contracts, domain, data, scaffold | ✅ closed (`docs/PHASE0_GATE.md`) |
-| 1 — Optimization core + benchmark | ✅ closed (`docs/PHASE1_GATE.md`) |
-| 2 — API (5 endpoints, CORS, budgets) | ✅ closed (`docs/PHASE2_GATE.md`) |
-| 3 — Builder UI | ✅ closed (`docs/PHASE3_GATE.md`) |
-| 4 — Results route | ✅ closed (`docs/PHASE4_GATE.md`) |
-| 5 — Hardening / release | ✅ closed (`docs/PHASE5_GATE.md`) — **MVP COMPLETE** |
+| 0 — Contracts, domain, data, scaffold | closed (`docs/PHASE0_GATE.md`) |
+| 1 — Optimization core + benchmark | closed (`docs/PHASE1_GATE.md`) |
+| 2 — API (5 endpoints, CORS, budgets) | closed (`docs/PHASE2_GATE.md`) |
+| 3 — Builder UI | closed (`docs/PHASE3_GATE.md`) |
+| 4 — Results route | closed (`docs/PHASE4_GATE.md`) |
+| 5 — Hardening / release | closed (`docs/PHASE5_GATE.md`) — **MVP COMPLETE** |
 
 ## Quick start
 

@@ -216,7 +216,7 @@ export function CalendarRules({
             {INVARIANTS.map((rule) => (
               <li key={rule} className="flex items-center gap-2">
                 <span aria-hidden="true" className="font-tel text-xs text-pass">
-                  ✓
+                  OK
                 </span>
                 <span>{rule}</span>
               </li>
