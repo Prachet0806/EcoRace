@@ -44,8 +44,18 @@ test("calendar knobs are configurable without running", async ({ page }) => {
   await page.getByRole("button", { name: "On", exact: true }).click();
   await expect(page.getByLabel("Summer break start weekend")).toHaveCount(0);
 
-  await page.getByLabel("Pin finale to first December week").check();
-  await expect(page.getByLabel("Pin finale to first December week")).toBeChecked();
+  await page.getByLabel(/Pin finale to final planning weekend/).check();
+  await expect(page.getByLabel(/Pin finale to final planning weekend/)).toBeChecked();
+});
+
+test("turning off the summer break survives a builder reload", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByLabel("Summer break start weekend")).toBeVisible();
+  await page.getByRole("button", { name: "On", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Off", exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Off", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Summer break start weekend")).toHaveCount(0);
 });
 
 test("status rail and preview track the selection", async ({ page }) => {

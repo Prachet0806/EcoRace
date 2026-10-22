@@ -27,7 +27,7 @@ interface ScenarioState {
   seasonYear: number;
   calendarSource: CalendarSource;
   maxConsecutive: number;
-  summerBreak: SummerBreak | null;
+  summerBreak: SummerBreak | null | undefined;
   pinEnd: boolean;
   status: OptimizeStatus;
   errorCode: string | null;
@@ -62,7 +62,7 @@ export const useScenarioStore = create<ScenarioState>()(
       seasonYear: 2026,
       calendarSource: "custom" as CalendarSource,
       maxConsecutive: DEFAULT_STREAK_LIMIT,
-      summerBreak: null as SummerBreak | null,
+      summerBreak: undefined as SummerBreak | null | undefined,
       pinEnd: false,
       status: "idle",
       errorCode: null,

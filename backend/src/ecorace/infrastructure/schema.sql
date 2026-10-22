@@ -1,5 +1,5 @@
 -- EcoRace Planner SQLite Schema
--- Version 1: scenarios and runs tables
+-- Version 2: complete scenario configuration and run provenance.
 
 CREATE TABLE IF NOT EXISTS scenarios (
     id TEXT PRIMARY KEY,
@@ -9,6 +9,11 @@ CREATE TABLE IF NOT EXISTS scenarios (
     weekend_count INTEGER NOT NULL,
     horizon_start TEXT NOT NULL,
     horizon_end TEXT NOT NULL,
+    max_consecutive INTEGER,
+    summer_break_start INTEGER,
+    summer_break_end INTEGER,
+    pin_end_to_dec_week1 INTEGER,
+    config_complete INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -25,6 +30,7 @@ CREATE TABLE IF NOT EXISTS runs (
     constraints_json TEXT NOT NULL,
     solver_json TEXT NOT NULL,
     data_version TEXT NOT NULL,
+    provenance_json TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     completed_at TEXT
 );

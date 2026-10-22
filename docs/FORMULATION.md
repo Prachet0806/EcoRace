@@ -73,8 +73,9 @@ choice, not a model change. `SolutionValidator` checks the extracted
 - **Summer break** (0-based weekend index window, optional): break weekends
   are removed from the feasible pair universe before the small-side
   allowed/forbidden table choice.
-- **December finale pin** (optional): `t[N-1] = W−1` (last race on the final
-  horizon weekend, i.e. Dec W1).
+- **Finale pin** (optional): `t[N-1] = W−1` (last race on the final
+  horizon weekend, the first weekend that includes December 1; its Friday
+  can fall in November).
 - **Monthly minimum** (always on): every horizon month untouched by the
   summer break hosts ≥1 race, via reified `t[k] == w` booleans + one
   `BoolOr` per covered month.

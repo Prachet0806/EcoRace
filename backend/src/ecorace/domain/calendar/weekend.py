@@ -2,6 +2,7 @@
 
 Weekend = {Friday, Saturday, Sunday}, id = Friday ISO date.
 Season Y: first Friday >= Mar 1 .. first Friday with Sunday >= Dec 1, step 7d.
+The final Friday can be in November when its weekend includes December 1.
 """
 from __future__ import annotations
 
@@ -43,7 +44,7 @@ def first_friday_sunday_weekend(year: int, month: int) -> RaceWeekend:
 
 
 def season_weekends(year: int) -> tuple[RaceWeekend, ...]:
-    """Every Fri-Sun block from Mar W1 through Dec W1 inclusive.
+    """Every Fri-Sun block from Mar W1 through the final planning weekend.
 
     start = first Friday >= Mar 1.
     end   = first Friday with Sunday >= Dec 1 (i.e. Friday >= Dec1 - 2d).

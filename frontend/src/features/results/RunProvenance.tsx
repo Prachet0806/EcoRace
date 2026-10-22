@@ -8,6 +8,13 @@ export function RunProvenance({ run, source }: { run: RunPayload; source: "sessi
   const rows: Array<[string, string]> = [
     ["Run ID", run.run_id],
     ["Data version", run.data_version],
+    ["Weather policy", run.provenance ? `${run.provenance.weather_version}${run.provenance.weather_synthetic ? " (synthetic demo)" : ""}` : "not recorded"],
+    ["Weather SHA-256", run.provenance?.weather_sha256 ?? "not recorded"],
+    ["Circuit SHA-256", run.provenance?.circuits_sha256 ?? "not recorded"],
+    ["Requested budget", run.provenance ? `${run.provenance.requested_budget_s}s` : "not recorded"],
+    ["Seed schedule", run.provenance?.seed_schedule.join(", ") ?? "not recorded"],
+    ["Executed seeds", run.provenance?.attempts.map((a) => a.seed).join(", ") ?? "not recorded"],
+    ["Total execution time", run.provenance ? `${(run.provenance.total_runtime_ms / 1000).toFixed(1)}s` : "not recorded"],
     ["Solver", `${run.solver.name} ${run.solver.version}`.trim()],
     ["Seed", String(run.solver.seed)],
     ["Execution time", `${(run.solver.runtime_ms / 1000).toFixed(1)}s`],

@@ -107,6 +107,25 @@ export interface RunPayload {
     origin: string;
   };
   data_version: string;
+  provenance?: {
+    weather_version: string;
+    weather_sha256: string | null;
+    circuits_sha256: string;
+    weather_synthetic: boolean;
+    scenario: {
+      race_count: number;
+      circuit_ids: string[];
+      season_year: number;
+      max_consecutive: number;
+      summer_break_start: number | null;
+      summer_break_end: number | null;
+      pin_end_to_dec_week1: boolean;
+    };
+    requested_budget_s: number;
+    seed_schedule: number[];
+    attempts: Array<{ seed: number; status: string; km: number | null; time_limit_s: number; runtime_ms: number }>;
+    total_runtime_ms: number;
+  } | null;
 }
 
 export type HoverTarget = { kind: "race" | "segment"; id: string } | null;

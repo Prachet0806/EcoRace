@@ -130,7 +130,17 @@ class ORToolsSolver:
                     model.AddHint(b, month == hint_months[k])
 
         solver = cp_model.CpSolver()
-        solver.parameters.max_time_in_seconds = max(config.time_limit_s, 0.0)
+        remaining = (
+            config.deadline_monotonic - time.monotonic()
+            if config.deadline_monotonic is not None else config.time_limit_s
+        )
+        if remaining <= 0:
+            return None, SolverMetadata(
+                solver_name=self.name, solver_version=_ORTOOLS_VERSION, seed=config.seed,
+                runtime_ms=int((time.perf_counter() - t0) * 1000), time_limit_s=0.0,
+                status=SolveStatus.SOLVER_TIMEOUT, data_version=problem.data_version,
+            )
+        solver.parameters.max_time_in_seconds = min(max(config.time_limit_s, 0.0), remaining)
         solver.parameters.random_seed = config.seed
         solver.parameters.num_search_workers = config.num_workers
         # Presolve OFF by default: Probe can expand table/element encodings

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+import logging
 
 from ecorace.application.optimization_service import AppError
 from ecorace.interface.http.logging import request_id_var
@@ -34,6 +35,7 @@ async def validation_handler(_: Request, exc: RequestValidationError) -> JSONRes
 
 
 async def internal_error_handler(_: Request, exc: Exception) -> JSONResponse:
+    logging.getLogger("ecorace.errors").exception("unexpected_request_error", exc_info=exc)
     return JSONResponse(
         status_code=500,
         content=envelope("INTERNAL_ERROR", "An unexpected error occurred.", []),

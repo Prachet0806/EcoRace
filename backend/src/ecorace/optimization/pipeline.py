@@ -10,6 +10,8 @@ the clean calendar wins and the disagreement is recorded, never hidden.
 """
 from __future__ import annotations
 
+import time
+
 from ecorace.analytics.baseline import BaselineInfeasible, build_baseline
 from ecorace.domain.calendar.calendar import Calendar
 from ecorace.domain.calendar.scenario import Scenario, validate_scenario
@@ -133,11 +135,20 @@ def optimize(problem: OptimizationProblem, config: SolverConfig = SolverConfig()
     # Deterministic portfolio: CP-SAT solution quality is not monotone in the
     # time limit (measured P1: 30s runs worse than 5s at same seed), so run the
     # fixed seed schedule and keep the best validator-clean calendar.
-    for idx, s in enumerate(config.seeds or (config.seed,)):
+    for idx, s in enumerate(config.seeds or tuple(config.seed + i for i in range(3))):
+        remaining = (
+            config.deadline_monotonic - time.monotonic()
+            if config.deadline_monotonic is not None
+            else config.time_limit_s
+        )
+        if remaining <= 0:
+            break
         seed_cfg = SolverConfig(
-            time_limit_s=config.time_limit_s,
+            time_limit_s=min(config.time_limit_s, remaining),
             seed=s,
             seeds=(s,),
+            deadline_monotonic=(min(config.deadline_monotonic, time.monotonic() + config.time_limit_s)
+                                if config.deadline_monotonic is not None else None),
             num_workers=config.num_workers,
             use_hint=config.use_hint,
             # First seed solves WITH presolve: locks the clean hint almost
@@ -153,9 +164,18 @@ def optimize(problem: OptimizationProblem, config: SolverConfig = SolverConfig()
             km_s = order_distance_km(race_order(cal_s), problem.circuits)
             if km_s < best_km:
                 best_km, o_cal, o_meta = km_s, cal_s, meta_s
-        attempts.append({"seed": s, "status": meta_s.status.value, "km": km_s})
+        attempts.append({"seed": s, "status": meta_s.status.value, "km": km_s,
+                         "time_limit_s": seed_cfg.time_limit_s, "runtime_ms": meta_s.runtime_ms})
     if o_meta is None:
-        o_meta = last_meta  # every seed failed cleanly (timeout/infeasible)
+        o_meta = last_meta or SolverMetadata(
+            solver_name="ortools",
+            solver_version="not_started",
+            seed=config.seed,
+            runtime_ms=0,
+            time_limit_s=0.0,
+            status=SolveStatus.SOLVER_TIMEOUT,
+            data_version=problem.data_version,
+        )
 
     diagnostics = {
         "heuristic_km": h_meta.objective_km,
@@ -210,6 +230,7 @@ def optimize(problem: OptimizationProblem, config: SolverConfig = SolverConfig()
 
     if best is not None:
         cal, meta, status, origin = best
+        diagnostics["solver_disagreement"] = any(a["status"] == SolveStatus.INFEASIBLE.value for a in attempts)
         return OptimizationResult(
             status=status,
             calendar=cal,

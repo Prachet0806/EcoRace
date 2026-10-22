@@ -169,6 +169,8 @@ class HeuristicSolver:
         break_ids = summer_break_weekend_ids(scen, problem.weekends)
         last_id = problem.weekends[-1].id if scen.pin_end_to_dec_week1 else None
         for start in range(len(ids)):
+            if config.deadline_monotonic is not None and time.monotonic() >= config.deadline_monotonic:
+                break
             order_idx = two_opt(nearest_neighbor(ids, matrix, start), matrix)
             order = [ids[i] for i in order_idx]
             cals: list[Calendar] = []

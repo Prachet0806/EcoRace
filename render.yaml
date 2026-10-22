@@ -21,6 +21,8 @@ services:
         value: "0"
       - key: SOLVER_TIMEOUT_SECONDS
         value: "45"
+      - key: SOLVER_MAX_CONCURRENT
+        value: "1"
       - key: LOG_LEVEL
         value: INFO
       # Baked into the Dockerfile already; listed here to pin the contract.

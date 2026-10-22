@@ -16,7 +16,7 @@ interface Props {
   seasonYear: number;
   sourceLocked: boolean;
   maxConsecutive: number;
-  summerBreak: SummerBreak | null;
+  summerBreak: SummerBreak | null | undefined;
   pinEnd: boolean;
   weekends: SeasonWeekend[];
   onRaceCount: (n: number) => void;
@@ -37,7 +37,7 @@ function fmtWeekend(w: SeasonWeekend, i: number): string {
 const INVARIANTS = [
   "One race per weekend",
   "Friday–Sunday race weekends",
-  "Weather feasibility enforced",
+  "Synthetic weather demo policy applied",
   "Unique circuit assignment",
 ];
 
@@ -206,7 +206,7 @@ export function CalendarRules({
                 onChange={(e) => onPinEnd(e.target.checked)}
                 className="h-4 w-4 accent-[#e10600]"
               />
-              Pin finale to first December week
+              Pin finale to final planning weekend{weekends.length > 0 ? ` (${fmtDay(weekends[weekends.length - 1].friday)})` : ""}
             </label>
           </div>
         </div>

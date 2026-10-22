@@ -55,3 +55,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build -f backend/Dockerfile -t ecorace-api:ci .
+      - name: Container and persistence smoke
+        run: |
+          set -euo pipefail
+          docker volume create ecorace-ci-data
+          trap 'docker rm -f ecorace-ci >/dev/null 2>&1 || true; docker volume rm ecorace-ci-data >/dev/null 2>&1 || true' EXIT
+          docker run -d --name ecorace-ci -p 18000:8000 -v ecorace-ci-data:/var/data ecorace-api:ci
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:18000/api/v1/health >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://localhost:18000/api/v1/health | jq -e '.status == "ok"'
+          ids=$(curl -fsS http://localhost:18000/api/v1/circuits | jq -c '[.circuits[:20][] | .id]')
+          test "$(echo "$ids" | jq 'length')" -eq 20
+          payload=$(jq -n --argjson ids "$ids" '{race_count:20,circuit_ids:$ids,season_year:2026,budget_s:9}')
+          run_id=$(curl -fsS -H 'content-type: application/json' -d "$payload" http://localhost:18000/api/v1/optimization/runs | jq -er '.run_id')
+          docker rm -f ecorace-ci
+          docker run -d --name ecorace-ci -p 18000:8000 -v ecorace-ci-data:/var/data ecorace-api:ci
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:18000/api/v1/health >/dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS "http://localhost:18000/api/v1/optimization/runs/$run_id" | jq -e --arg id "$run_id" '.run_id == $id'

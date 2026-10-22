@@ -12,7 +12,7 @@ export function MetricsDashboard({ run }: { run: RunPayload }) {
   const m = run.metrics;
   const baselineStatus = m.baseline_status ?? "ok";
   const baselineComparable = baselineStatus === "ok";
-  const saving = m.saving_km;
+  const saving = baselineComparable ? m.saving_km : null;
   const isRegression = saving != null && saving < -1e-6;
   const isImprovement = saving != null && saving > 1e-6;
   const savingPct =
@@ -25,7 +25,7 @@ export function MetricsDashboard({ run }: { run: RunPayload }) {
     saving == null ? "—" : isRegression ? `+${fmt(Math.abs(saving))} km` : `−${fmt(Math.abs(saving))} km`;
   const changeCaption =
     saving == null
-      ? "no baseline"
+      ? baselineComparable ? "no baseline" : "not comparable"
       : savingPct == null
         ? "—"
         : isRegression

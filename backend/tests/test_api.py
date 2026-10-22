@@ -1,5 +1,7 @@
 """P2 gate: HTTP integration, stable error codes, response contracts, CORS."""
 from ecorace.infrastructure import data_loader
+from ecorace.infrastructure import persistence
+from ecorace.application import optimization_service as svc
 from ecorace.interface.http.app import create_app
 from fastapi.testclient import TestClient
 
@@ -37,12 +39,17 @@ def test_circuits_expose_venue_provenance():
 
 
 def test_create_scenario_ok():
-    r = client.post("/api/v1/scenarios", json={"race_count": 20, "circuit_ids": IDS[:20]})
-    assert r.status_code == 201, r.text
-    body = r.json()
+    body = svc.create_scenario(20, IDS[:20], 2026, max_consecutive=2,
+                               summer_break_start=19, summer_break_end=21, pin_end_to_dec_week1=True)
     assert body["scenario_id"].startswith("scn_")
     assert body["weekend_count"] == 40
     assert body["horizon"] == {"start": "2026-03-06", "end": "2026-12-04"}
+    stored = persistence.get_scenario(body["scenario_id"])
+    assert stored is not None
+    assert stored["config_complete"] is True
+    assert stored["max_consecutive"] == 2
+    assert (stored["summer_break_start"], stored["summer_break_end"]) == (19, 21)
+    assert stored["pin_end_to_dec_week1"] is True
 
 
 def test_scenario_error_codes():
@@ -60,7 +67,7 @@ def test_scenario_error_codes():
         ({"race_count": 20, "circuit_ids": IDS[:20], "summer_break_start": 19}, "INVALID_SUMMER_BREAK"),
     ]
     for payload, code in cases:
-        r = client.post("/api/v1/scenarios", json=payload)
+        r = client.post("/api/v1/optimization/runs", json=payload)
         assert r.status_code == 422, (payload, r.text)
         assert r.json()["error"]["code"] == code, (payload, r.json())
 
@@ -85,10 +92,16 @@ def test_run_happy_path_contract():
     assert [x["race_id"] for x in cal["races"]] == [f"race-{i + 1:02d}" for i in range(20)]
     assert len(body["segments"]) == 19
     assert body["segments"][0]["segment_id"] == "seg-01"
-    assert body["metrics"]["total_distance_km"] <= body["metrics"]["baseline_distance_km"]
+    if body["metrics"]["baseline_status"] == "ok":
+        assert body["metrics"]["total_distance_km"] <= body["metrics"]["baseline_distance_km"]
+    else:
+        assert body["metrics"]["saving_km"] is None
     assert all(c["satisfied"] for c in body["constraints"])
     assert body["solver"]["optimality_proven"] in (True, False)
     assert body["data_version"] == "fia-grade1-2026-03-31+f1-2020-2026"
+    assert body["provenance"]["weather_synthetic"] is True
+    assert body["provenance"]["weather_sha256"]
+    assert body["provenance"]["seed_schedule"] == [0, 1, 2]
     # Route geometry sanity: segment endpoints match race order.
     for seg, a, b in zip(body["segments"], cal["races"], cal["races"][1:]):
         assert (seg["from_circuit_id"], seg["to_circuit_id"]) == (a["circuit_id"], b["circuit_id"])
@@ -115,6 +128,8 @@ def test_run_with_knobs_contract():
     names = {c["name"] for c in body["constraints"]}
     assert {"weather", "max_consecutive", "summer_break", "monthly_minimum", "dec_end_pin", "race_count_unique"} <= names
     assert all(c["satisfied"] for c in body["constraints"])
+    assert body["provenance"]["scenario"]["max_consecutive"] == 2
+    assert body["provenance"]["scenario"]["summer_break_start"] == 19
 
 
 def test_season_weekends_endpoint():
@@ -152,6 +167,20 @@ def test_run_error_codes_fast():
     assert r.json()["error"]["code"] == "INVALID_REQUEST"
 
 
+def test_unsupported_request_fields_are_rejected():
+    base = {"race_count": 20, "circuit_ids": IDS[:20]}
+    for extra in ({"objective": {"type": "carbon"}}, {"constraints": {"custom": True}}):
+        r = client.post("/api/v1/optimization/runs", json={**base, **extra})
+        assert r.status_code == 422
+        assert r.json()["error"]["code"] == "INVALID_REQUEST"
+
+
 def test_cors_allows_configured_origin():
     r = client.get("/api/v1/health", headers={"Origin": "http://localhost:3000"})
     assert r.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
+def test_public_history_and_delete_routes_are_absent():
+    assert client.get("/api/v1/scenarios").status_code == 404
+    assert client.get("/api/v1/optimization/runs").status_code == 405
+    assert client.delete("/api/v1/scenarios/scn_unknown").status_code == 404

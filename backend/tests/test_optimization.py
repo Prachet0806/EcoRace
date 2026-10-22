@@ -1,4 +1,5 @@
 """P1 gate: solver correctness, determinism, timeout typing, validator independence."""
+import time
 from pathlib import Path
 
 from ecorace.domain.calendar.calendar import Calendar
@@ -14,6 +15,7 @@ from ecorace.optimization.heuristics import (
 )
 from ecorace.optimization.model import SolverConfig, SolveStatus, build_distance_matrix, order_distance_km
 from ecorace.optimization.pipeline import build_problem, optimize
+from ecorace.optimization import pipeline
 from ecorace.optimization.validator import SolutionValidator
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -93,6 +95,15 @@ def test_timeout_is_typed_never_fake():
     assert res.status in (SolveStatus.SOLVER_TIMEOUT, SolveStatus.FEASIBLE, SolveStatus.FEASIBLE_TIMEOUT)
     if res.calendar is not None:
         assert SolutionValidator.validate(res.calendar, _problem(24).scenario, WEEKENDS, WEATHER) == ()
+
+
+def test_expired_deadline_does_not_start_cp_sat(monkeypatch):
+    def unexpected_solve(*args, **kwargs):
+        raise AssertionError("CP-SAT started after the end-to-end deadline")
+    monkeypatch.setattr(pipeline.ORToolsSolver, "solve", unexpected_solve)
+    res = optimize(_problem(20), SolverConfig(time_limit_s=9, seed=7,
+                                              deadline_monotonic=time.monotonic() - 1))
+    assert res.status == SolveStatus.SOLVER_TIMEOUT
 
 
 def test_heuristic_standalone_valid():

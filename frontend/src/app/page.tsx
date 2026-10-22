@@ -62,7 +62,7 @@ export default function EcoRacePage() {
   // sticks for the session.
   const augustDefaultApplied = useRef(false);
   useEffect(() => {
-    if (weekends.length === 0 || summerBreak !== null || augustDefaultApplied.current) return;
+    if (weekends.length === 0 || summerBreak !== undefined || augustDefaultApplied.current) return;
     augustDefaultApplied.current = true;
     const august = firstAugustWeeks(weekends, 3);
     if (august) setSummerBreak(august);

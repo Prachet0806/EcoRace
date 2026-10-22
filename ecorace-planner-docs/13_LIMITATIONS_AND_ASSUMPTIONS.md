@@ -17,6 +17,11 @@ EcoRace Planner is a decision-support and optimization model, not an authoritati
 
 Weather feasibility is a model policy.
 
+The current `weather-v1.json` is a synthetic demonstration fixture. It blocks
+two Monza dates in 2026 and treats other circuit/weekend pairs as feasible by
+default. A validator-clean result is therefore not evidence of realistic
+weather suitability. Run provenance records the policy version and hash.
+
 A weather-feasible assignment means the configured weather dataset/policy considers that circuit/weekend combination acceptable.
 
 It does not guarantee actual race-day weather.

@@ -1,6 +1,6 @@
 # EcoRace Planner
 
-**A decision-support platform for optimizing the F1 calendar for sustainability and logistics efficiency.**
+**A calendar-planning experiment that minimizes approximate venue-to-venue travel distance.**
 
 **Live demo: https://eco-race-two.vercel.app/**
 
@@ -9,8 +9,9 @@ travel route under hard scheduling and weather constraints, and inspect the
 result: timeline, route map, metrics, and baseline comparison.
 
 > Decision-support experiment, not an authoritative F1 calendar.
-> Distances are great-circle approximations; weather is a feasibility policy,
-> not a forecast. See `ecorace-planner-docs/13_LIMITATIONS_AND_ASSUMPTIONS.md`.
+> Distances are great-circle approximations, not emissions. The current weather
+> policy is a synthetic demo fixture, not a forecast or historical climate
+> assessment. See `ecorace-planner-docs/13_LIMITATIONS_AND_ASSUMPTIONS.md`.
 
 ## How it works
 
@@ -18,10 +19,10 @@ result: timeline, route map, metrics, and baseline comparison.
 Select tracks → Configure calendar → Optimize → Inspect result
 ```
 
-1. **Builder** (`/`): two-pane track selector, race count 20–24, season 2025/2026.
+1. **Builder** (`/`): two-pane track selector, race count 20–24, fixed 2026 season.
 2. **Optimizer** (FastAPI): CP-SAT + heuristic portfolio minimizing total travel
    distance subject to one-race-per-weekend, max 3 consecutive races + break,
-   weather feasibility, and circuit uniqueness.
+   synthetic weather-policy feasibility, and circuit uniqueness.
 3. **Results** (`/results/{run_id}`): timeline, MapLibre route, metrics,
    baseline comparison, travel legs, constraint diagnostics.
 
@@ -33,8 +34,8 @@ backend/src/ecorace/   FastAPI + domain + optimization core
   optimization/         solver pipeline: result = optimize(problem)
   application/          scenario/run orchestration (no HTTP/SQL)
   interface/http/       routes, DTOs, error envelope
-  infrastructure/       JSON reference-data loader
-backend/tests/          pytest suite (29 tests) + benchmark harnesses
+  infrastructure/       JSON reference-data loader and SQLite storage
+backend/tests/          pytest suite and benchmark harnesses
 frontend/src/           Next.js (App Router) + Tailwind + zustand + MapLibre
   app/                   builder page (`page.tsx` at root)
   app/results/[runId]/     results page
@@ -81,16 +82,26 @@ See **[QUICKSTART.md](QUICKSTART.md)** — backend + frontend up in ~5 minutes.
 - Streak limit configurable `max_consecutive` 2–7 (default 3), enforced with
   a mandatory break after a full run.
 - Optional summer-break window (0-based weekend indices) excludes weekends
-  from scheduling; optional December-finale pin fixes the last race to Dec W1.
+  from scheduling; the finale pin fixes the last race to the final horizon
+  weekend, whose Friday may fall in November for some supported years.
 - Monthly minimum: every horizon month untouched by the summer break hosts
   at least one race.
-- Weather is a hard `Circuit × Weekend → feasible/infeasible` policy.
+- Weather is a hard `Circuit × Weekend → feasible/infeasible` policy. The
+  shipped fixture has only two blocked cells and defaults other pairs to true.
 - Distance: Haversine km (`R = 6371.0088`), float end-to-end, rounded only
   for display.
 - Every `feasible` result is independently validator-clean; non-optimal
   incumbents are marked `feasible_timeout`, never presented as optimal.
 - Errors use `{error: {code, message, details}}` with stable codes
   (`INSUFFICIENT_CIRCUITS`, `SCENARIO_INFEASIBLE`, `SOLVER_TIMEOUT`, …).
+- The anonymous API exposes run creation and lookup by opaque ID; public
+  history/deletion endpoints are disabled. SQLite retains runs on a persistent
+  volume; the supplied Render blueprint uses ephemeral storage.
+- A baseline that violates hard rules is shown as a reference only, with no
+  savings claim. Run provenance records scenario choices and weather policy.
+
+Historical phase-gate reports describe earlier snapshots; this README and
+`docs/DEPLOY.md` describe the current API and deployment contract.
 
 ## Version pins
 

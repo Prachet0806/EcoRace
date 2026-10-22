@@ -10,9 +10,8 @@ export type LoadState =
   | { state: "missing" }
   | { state: "error"; code: string; message: string };
 
-// Results loader: sessionStorage stash first (survives backend restarts),
-// API refetch second (supports deep links while the backend is alive).
-// MVP has no DB: a missing run after restart is reported, not faked.
+// Results loader: sessionStorage stash first, then persisted API data.
+// On an ephemeral deployment, browser storage may outlive the API database.
 export function useRunResult(runId: string): LoadState {
   const [load, setLoad] = useState<LoadState>({ state: "loading" });
 

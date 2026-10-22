@@ -6,6 +6,7 @@ No HTTP, no solver syntax, no SQL here — only calls into domain/optimization/i
 from __future__ import annotations
 
 import uuid
+import time
 from dataclasses import dataclass, field
 
 from ecorace.analytics.distance import haversine_km
@@ -57,6 +58,8 @@ def create_scenario(
     summer_break_start: int | None = None,
     summer_break_end: int | None = None,
     pin_end_to_dec_week1: bool = False,
+    *,
+    persist: bool = True,
 ) -> dict:
     circuits, _ = data_loader.circuits_bundle()
     weekends = data_loader.season(season_year)
@@ -74,7 +77,7 @@ def create_scenario(
     except _DOMAIN_ERRORS as e:
         raise AppError(code=_domain_error_code(e), message=str(e), status_code=422) from e
     result = {
-        "scenario_id": f"scn_{uuid.uuid4().hex[:12]}",
+        "scenario_id": f"scn_{uuid.uuid4().hex}",
         "race_count": race_count,
         "circuit_ids": list(circuit_ids),
         "season_year": season_year,
@@ -85,7 +88,8 @@ def create_scenario(
         "weekend_count": len(weekends),
         "horizon": {"start": weekends[0].id, "end": weekends[-1].id},
     }
-    persistence.save_scenario(result)
+    if persist:
+        persistence.save_scenario(result)
     return result
 
 
@@ -101,6 +105,8 @@ def run_optimization(
     summer_break_end: int | None = None,
     pin_end_to_dec_week1: bool = False,
 ) -> dict:
+    started = time.monotonic()
+    deadline = started + total_budget_s
     circuits, circuits_tag = data_loader.circuits_bundle()
     weather = data_loader.weather_policy()
     try:
@@ -123,16 +129,19 @@ def run_optimization(
     except InfeasibleProblem as e:
         raise AppError(code="SCENARIO_INFEASIBLE", message=str(e), status_code=422) from e
 
-    per_seed = max(1.0, total_budget_s / 3.0)
-    result = optimize(problem, SolverConfig(time_limit_s=per_seed, seed=seed))
-    run_result = present_result(result, scenario, weekends, weather, circuits_tag)
+    seeds = tuple(seed + i for i in range(3))
+    result = optimize(problem, SolverConfig(time_limit_s=total_budget_s / 3.0, seed=seed, seeds=seeds,
+                                            deadline_monotonic=deadline))
+    run_result = present_result(result, scenario, weekends, weather, circuits_tag, total_budget_s, seeds,
+                                int((time.monotonic() - started) * 1000))
     if scenario_id:
         run_result["scenario_id"] = scenario_id
-    persistence.save_run(run_result)
     return run_result
 
 
-def present_result(result: OptimizationResult, scenario: Scenario, problem_weekends, weather, circuits_tag: str) -> dict:
+def present_result(result: OptimizationResult, scenario: Scenario, problem_weekends, weather,
+                   circuits_tag: str, total_budget_s: float, seeds: tuple[int, ...],
+                   total_runtime_ms: int) -> dict:
     circuits, _ = data_loader.circuits_bundle()
     if result.status == SolveStatus.INFEASIBLE:
         raise AppError(code="SCENARIO_INFEASIBLE", message="No feasible calendar satisfies the configured constraints.", status_code=422)
@@ -185,10 +194,11 @@ def present_result(result: OptimizationResult, scenario: Scenario, problem_weeke
         for v in SolutionValidator.validate(cal, scenario, problem_weekends, weather)
     ]
     saving = None
-    if result.total_distance_km is not None and result.baseline_distance_km:
+    if (result.diagnostics.get("baseline_status") == "ok" and result.total_distance_km is not None
+            and result.baseline_distance_km is not None):
         saving = round(result.baseline_distance_km - result.total_distance_km, 2)
     return {
-        "run_id": f"run_{uuid.uuid4().hex[:12]}",
+        "run_id": f"run_{uuid.uuid4().hex}",
         "status": result.status.value,
         "season_year": problem_weekends[0].friday.year,
         "calendar": {
@@ -224,4 +234,23 @@ def present_result(result: OptimizationResult, scenario: Scenario, problem_weeke
             "origin": result.diagnostics.get("origin"),
         },
         "data_version": circuits_tag,
+        "provenance": {
+            "weather_version": weather.version,
+            "weather_sha256": weather.source_hash,
+            "circuits_sha256": data_loader.circuits_sha256(),
+            "weather_synthetic": weather.synthetic,
+            "scenario": {
+                "race_count": scenario.race_count,
+                "circuit_ids": list(scenario.circuit_ids),
+                "season_year": scenario.season_year,
+                "max_consecutive": scenario.max_consecutive,
+                "summer_break_start": scenario.summer_break_start,
+                "summer_break_end": scenario.summer_break_end,
+                "pin_end_to_dec_week1": scenario.pin_end_to_dec_week1,
+            },
+            "requested_budget_s": total_budget_s,
+            "seed_schedule": list(seeds),
+            "attempts": result.diagnostics.get("attempts", []),
+            "total_runtime_ms": total_runtime_ms,
+        },
     }

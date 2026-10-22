@@ -53,8 +53,8 @@ export default function ResultsPage({ params }: { params: Promise<{ runId: strin
         <PageContainer>
           <h1 className="font-display text-2xl font-extrabold tracking-tight italic">Result not available</h1>
           <p className="text-sm text-mute">
-            Run <span className="font-tel">{runId}</span> was not found. MVP runs live in the API&apos;s memory, so a
-            backend restart clears them — re-run the optimization to get a fresh result.
+            Run <span className="font-tel">{runId}</span> was not found. This deployment may use temporary storage;
+            results can disappear after a restart. Re-run the optimization to get a fresh result.
           </p>
         </PageContainer>
       </AppShell>

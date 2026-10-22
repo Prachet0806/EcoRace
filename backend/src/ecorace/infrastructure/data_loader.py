@@ -7,6 +7,7 @@ contain non-ASCII characters.
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 from functools import lru_cache
 from pathlib import Path
@@ -36,6 +37,11 @@ def circuits_bundle() -> tuple[dict, str]:
 @lru_cache(maxsize=1)
 def weather_policy() -> WeatherPolicy:
     return WeatherPolicy.from_json(data_dir() / "weather" / "weather-v1.json")
+
+
+@lru_cache(maxsize=1)
+def circuits_sha256() -> str:
+    return hashlib.sha256((data_dir() / "circuits.json").read_bytes()).hexdigest()
 
 
 def season(year: int) -> tuple[RaceWeekend, ...]:

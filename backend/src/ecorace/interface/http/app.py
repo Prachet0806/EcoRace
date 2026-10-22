@@ -13,8 +13,10 @@ Config (env):
   RATE_LIMIT_DEFAULT: default rate limit (default 60/minute)
   RATE_LIMIT_HEALTH: health endpoint limit (default 120/minute)
   RATE_LIMIT_CIRCUITS: circuits endpoint limit (default 60/minute)
-  RATE_LIMIT_SCENARIOS: scenarios endpoint limit (default 30/minute)
-  RATE_LIMIT_RUNS: optimization runs endpoint limit (default 10/minute)
+  RATE_LIMIT_WEEKENDS: season weekends endpoint limit (default 60/minute)
+  RATE_LIMIT_RUNS: optimization creation limit (default 10/minute)
+  RATE_LIMIT_GET_RUN: result read limit (default 60/minute)
+  SOLVER_MAX_CONCURRENT: solver slots per process (default 1)
   ECORACE_DB_PATH: SQLite database path (default ./data/ecorace.db)
 """
 from __future__ import annotations
@@ -23,6 +25,7 @@ import ipaddress
 import logging
 import os
 import socket
+import threading
 
 from ecorace.application.optimization_service import AppError
 from ecorace.infrastructure import persistence
@@ -32,14 +35,13 @@ from ecorace.interface.http.errors import (
     validation_handler,
 )
 from ecorace.interface.http.logging import request_id_middleware, setup_logging
-from ecorace.interface.http.routes import init_rate_limits, router
+from ecorace.interface.http.routes import limiter, router
 from ecorace.optimization.circuit_breaker import CircuitBreaker
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
 
 def _lan_origins() -> list[str]:
@@ -97,14 +99,10 @@ def create_app() -> FastAPI:
     app.state.circuit_breaker = CircuitBreaker(failure_threshold=cb_threshold, cooldown_s=cb_cooldown)
 
     app.state.solver_budget_s = float(os.environ.get("SOLVER_TIMEOUT_SECONDS", "30"))
-    app.state.runs = {}
-    app.state.scenarios = {}
+    app.state.solver_slots = threading.BoundedSemaphore(max(1, int(os.environ.get("SOLVER_MAX_CONCURRENT", "1"))))
 
-    limiter = Limiter(key_func=get_remote_address, default_limits=[os.environ.get("RATE_LIMIT_DEFAULT", "60/minute")])
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-    init_rate_limits(limiter)
 
     # Initialize database
     persistence.init_db()

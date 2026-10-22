@@ -27,8 +27,9 @@ class SolveStatus(str, Enum):
 @dataclass(frozen=True)
 class SolverConfig:
     time_limit_s: float = 5.0
+    deadline_monotonic: float | None = None
     seed: int = 0
-    seeds: tuple[int, ...] = (0, 1, 2)
+    seeds: tuple[int, ...] = ()  # empty = requested seed and its next two values
     num_workers: int = 1  # 1 = deterministic; raise only for speed at cost of reproducibility
     use_hint: bool = True
     presolve: bool = False

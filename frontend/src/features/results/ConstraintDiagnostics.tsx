@@ -3,11 +3,11 @@
 import type { RunPayload } from "@/lib/types";
 
 const LABELS: Record<string, string> = {
-  weather: "Weather feasibility",
+  weather: "Synthetic weather policy feasibility",
   max_consecutive: "Consecutive-race limit",
   summer_break: "Summer break",
   monthly_minimum: "Monthly coverage",
-  dec_end_pin: "December finale pin",
+  dec_end_pin: "Final planning weekend pin",
   race_count_unique: "Race count & uniqueness",
 };
 
@@ -23,7 +23,7 @@ function detailFor(name: string, run: RunPayload): string {
     case "monthly_minimum":
       return "At least one race per month";
     case "dec_end_pin":
-      return "Finale on the first December weekend";
+      return "Finale on the final planning weekend";
     case "race_count_unique":
       return `${n} / ${n} unique`;
     default:

@@ -14,7 +14,7 @@ Get the API + builder running locally in ~5 minutes.
 cd C:\Users\prach\Documents\EcoRace
 
 # Install (once)
-pip install "fastapi==0.128.2" "pydantic==2.12.5" "ortools==9.15.6755" uvicorn pytest httpx
+pip install -e ".[test]"
 
 # Run tests (once, ~60s — includes solver runs)
 python -m pytest backend/tests/ -q
@@ -89,8 +89,9 @@ Rules that will reject your request (exact-match MVP):
 | `UnicodeDecodeError` on circuits | pull latest — loader pins UTF-8; don't edit JSON in ANSI editors |
 | Web shows "Could not load circuits" | API not on `:8000`, or set `NEXT_PUBLIC_ECORACE_API_URL` in `.env.local` + restart `npm run dev` |
 | Solve feels slow | expected: sync budget ≈ `SOLVER_TIMEOUT_SECONDS`; lower `budget_s` per request for faster, slightly worse routes. Calendar knobs (esp. monthly minimum) roughly triple first-solution time vs the bare model |
-| Status `feasible_timeout` | normal, not an error: best validator-clean calendar found within budget, optimality not proven. Typical savings still 65–70% vs baseline; raise the budget for better incumbents, not guaranteed proof |
-| `RUN_NOT_FOUND` after API restart | expected pre-DB: runs live in memory; re-run to get a fresh `run_id` |
+| Status `feasible_timeout` | a validator-clean calendar was found, but optimality was not proven. A savings figure is shown only when the baseline meets the same constraints |
+| `RUN_NOT_FOUND` after API restart | check `ECORACE_DB_PATH` and whether its directory persists; the Render blueprint uses ephemeral storage |
+| `SOLVER_OVERLOADED` | wait for the `Retry-After` interval; concurrent solves are limited per process |
 | Port clash | `Get-NetTCPConnection -LocalPort 8000/3000` → stop the owner process |
 
 ## 6. Testing from another device on your LAN (e.g. phone)
