@@ -1,4 +1,5 @@
 """V1.1 calendar knobs: configurable streak limit, summer break, Dec finale pin."""
+
 from pathlib import Path
 
 import pytest
@@ -26,7 +27,10 @@ WEEKENDS = season_weekends(2026)
 
 def _run_cal(length: int, start: int = 0) -> Calendar:
     w = list(WEEKENDS)
-    return Calendar(weekends=WEEKENDS, assignment={x.id: f"c{i}" for i, x in enumerate(w[start : start + length])})
+    return Calendar(
+        weekends=WEEKENDS,
+        assignment={x.id: f"c{i}" for i, x in enumerate(w[start : start + length])},
+    )
 
 
 def test_streak_limit_parameterized():
@@ -52,13 +56,22 @@ def test_scenario_knob_validation():
     with pytest.raises(InvalidSummerBreak):
         validate_scenario(Scenario(**base, summer_break_start=19), set(CIRCUITS))
     with pytest.raises(InvalidSummerBreak):
-        validate_scenario(Scenario(**base, summer_break_start=21, summer_break_end=19), set(CIRCUITS))
-    validate_scenario(Scenario(**base, summer_break_start=19, summer_break_end=21), set(CIRCUITS))
+        validate_scenario(
+            Scenario(**base, summer_break_start=21, summer_break_end=19), set(CIRCUITS)
+        )
+    validate_scenario(
+        Scenario(**base, summer_break_start=19, summer_break_end=21), set(CIRCUITS)
+    )
 
 
 def test_summer_break_resolution_clamped():
-    s = Scenario(race_count=20, circuit_ids=tuple(IDS[:20]), season_year=2026,
-                 summer_break_start=19, summer_break_end=21)
+    s = Scenario(
+        race_count=20,
+        circuit_ids=tuple(IDS[:20]),
+        season_year=2026,
+        summer_break_start=19,
+        summer_break_end=21,
+    )
     ids = summer_break_weekend_ids(s, WEEKENDS)
     assert ids == frozenset([WEEKENDS[19].id, WEEKENDS[20].id, WEEKENDS[21].id])
     s2 = Scenario(race_count=20, circuit_ids=tuple(IDS[:20]), season_year=2026)
@@ -67,8 +80,14 @@ def test_summer_break_resolution_clamped():
 
 def test_validator_summer_and_pin_violations():
     w = list(WEEKENDS)
-    s = Scenario(race_count=20, circuit_ids=tuple(IDS[:20]), season_year=2026,
-                 summer_break_start=0, summer_break_end=0, pin_end_to_dec_week1=True)
+    s = Scenario(
+        race_count=20,
+        circuit_ids=tuple(IDS[:20]),
+        season_year=2026,
+        summer_break_start=0,
+        summer_break_end=0,
+        pin_end_to_dec_week1=True,
+    )
     cal = Calendar(weekends=WEEKENDS, assignment={w[0].id: IDS[0], w[-2].id: IDS[1]})
     codes = {v.code for v in SolutionValidator.validate(cal, s, WEEKENDS, WEATHER)}
     assert "SUMMER_BREAK_VIOLATION" in codes
@@ -94,10 +113,17 @@ def test_validator_monthly_minimum():
             break
         spread.setdefault(x.id, IDS[len(spread)])
     full = Calendar(weekends=WEEKENDS, assignment=spread)
-    assert "MONTHLY_MINIMUM_VIOLATION" not in {v.code for v in SolutionValidator.validate(full, s, WEEKENDS, WEATHER)}
+    assert "MONTHLY_MINIMUM_VIOLATION" not in {
+        v.code for v in SolutionValidator.validate(full, s, WEEKENDS, WEATHER)
+    }
     # Break-touched months are exempt.
-    sb = Scenario(race_count=20, circuit_ids=tuple(IDS[:20]), season_year=2026,
-                  summer_break_start=0, summer_break_end=39)
+    sb = Scenario(
+        race_count=20,
+        circuit_ids=tuple(IDS[:20]),
+        season_year=2026,
+        summer_break_start=0,
+        summer_break_end=39,
+    )
     exempt = {v.code for v in SolutionValidator.validate(cal, sb, WEEKENDS, WEATHER)}
     assert "MONTHLY_MINIMUM_VIOLATION" not in exempt
 
@@ -106,9 +132,14 @@ def test_baseline_honors_knobs():
     order = IDS[:20]
     cal = build_baseline(order, list(WEEKENDS), WEATHER, max_consecutive=2)
     assert cal.max_streak() <= 2
-    cal = build_baseline(order, list(WEEKENDS), WEATHER, max_consecutive=2,
-                         forbidden_ids=frozenset([w.id for w in WEEKENDS[:10]]),
-                         last_weekend_id=WEEKENDS[-1].id)
+    cal = build_baseline(
+        order,
+        list(WEEKENDS),
+        WEATHER,
+        max_consecutive=2,
+        forbidden_ids=frozenset([w.id for w in WEEKENDS[:10]]),
+        last_weekend_id=WEEKENDS[-1].id,
+    )
     assert WEEKENDS[-1].id in cal.assignment
     assert not any(wid in [w.id for w in WEEKENDS[:10]] for wid in cal.assignment)
 
@@ -125,7 +156,11 @@ def test_pipeline_combined_knobs_feasible():
     )
     prob = build_problem(scen, CIRCUITS, WEEKENDS, WEATHER, data_version="test")
     res = optimize(prob, SolverConfig(time_limit_s=3.0, seed=0))
-    assert res.status in (SolveStatus.FEASIBLE_OPTIMAL, SolveStatus.FEASIBLE, SolveStatus.FEASIBLE_TIMEOUT)
+    assert res.status in (
+        SolveStatus.FEASIBLE_OPTIMAL,
+        SolveStatus.FEASIBLE,
+        SolveStatus.FEASIBLE_TIMEOUT,
+    )
     assert res.calendar is not None
     assert SolutionValidator.validate(res.calendar, scen, WEEKENDS, WEATHER) == ()
     assert res.calendar.max_streak() <= 2

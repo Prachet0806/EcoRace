@@ -3,6 +3,7 @@
 Reports per N in {20,22,24}: weekends, feasible cells, distance-matrix stats,
 baseline distance (greedy). Phase 1 appends solver wall-time/objective/gap.
 """
+
 import json
 import sys
 import time
@@ -25,9 +26,16 @@ IDS = load_circuit_ids(ROOT / "data" / "circuits.json")
 def run_case(n: int, year: int = 2026, repeats: int = 3) -> dict:
     weekends = list(season_weekends(year))
     order = IDS[:n]
-    feasible_cells = sum(1 for c in order for w in weekends if WEATHER.is_feasible(c, w.id))
+    feasible_cells = sum(
+        1 for c in order for w in weekends if WEATHER.is_feasible(c, w.id)
+    )
     dists = [
-        haversine_km(CIRCUITS[a].latitude, CIRCUITS[a].longitude, CIRCUITS[b].latitude, CIRCUITS[b].longitude)
+        haversine_km(
+            CIRCUITS[a].latitude,
+            CIRCUITS[a].longitude,
+            CIRCUITS[b].latitude,
+            CIRCUITS[b].longitude,
+        )
         for a in order
         for b in order
         if a != b
@@ -54,7 +62,9 @@ def run_case(n: int, year: int = 2026, repeats: int = 3) -> dict:
 if __name__ == "__main__":
     results = [run_case(n) for n in (20, 22, 24)]
     out = ROOT / "docs" / "BENCHMARK_P0.json"
-    out.write_text(json.dumps({"phase": "P0-shape-only", "results": results}, indent=2) + "\n")
+    out.write_text(
+        json.dumps({"phase": "P0-shape-only", "results": results}, indent=2) + "\n"
+    )
     for r in results:
         print(r)
     print(f"wrote {out}")

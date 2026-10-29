@@ -8,6 +8,7 @@ Every returned calendar is independently validator-clean. A solver claim of
 INFEASIBLE is only trusted when no validator-clean calendar exists; otherwise
 the clean calendar wins and the disagreement is recorded, never hidden.
 """
+
 from __future__ import annotations
 
 import time
@@ -56,18 +57,27 @@ def build_problem(
     blocked = [
         c
         for c in scenario.circuit_ids
-        if not any(weather.is_feasible(c, w.id) for w in weekends if w.id not in break_ids)
+        if not any(
+            weather.is_feasible(c, w.id) for w in weekends if w.id not in break_ids
+        )
     ]
     if blocked:
         raise InfeasibleProblem(f"no feasible weekend for: {blocked}")
     return OptimizationProblem(
-        scenario=scenario, weekends=weekends, circuits=circuits, weather=weather, data_version=data_version
+        scenario=scenario,
+        weekends=weekends,
+        circuits=circuits,
+        weather=weather,
+        data_version=data_version,
     )
 
 
 def race_order(calendar: Calendar) -> list[str]:
     weekend_pos = {w.id: i for i, w in enumerate(calendar.weekends)}
-    return [calendar.assignment[wid] for wid in sorted(calendar.assignment, key=weekend_pos.__getitem__)]
+    return [
+        calendar.assignment[wid]
+        for wid in sorted(calendar.assignment, key=weekend_pos.__getitem__)
+    ]
 
 
 def _baseline_calendar(
@@ -91,12 +101,16 @@ def _baseline_calendar(
             problem.weather,
             max_consecutive=problem.scenario.max_consecutive,
             forbidden_ids=summer_break_weekend_ids(problem.scenario, problem.weekends),
-            last_weekend_id=problem.weekends[-1].id if problem.scenario.pin_end_to_dec_week1 else None,
+            last_weekend_id=problem.weekends[-1].id
+            if problem.scenario.pin_end_to_dec_week1
+            else None,
         )
     except BaselineInfeasible:
         return None, None, "infeasible"  # never blocks optimization, per contract
     km = order_distance_km(race_order(cal), problem.circuits)
-    violations = SolutionValidator.validate(cal, problem.scenario, problem.weekends, problem.weather)
+    violations = SolutionValidator.validate(
+        cal, problem.scenario, problem.weekends, problem.weather
+    )
     if violations:
         codes = sorted({v.code for v in violations})
         return cal, km, f"non_comparable:{'+'.join(codes)}"
@@ -108,7 +122,9 @@ def _baseline_km(problem: OptimizationProblem) -> tuple[float | None, str]:
     return km, status
 
 
-def optimize(problem: OptimizationProblem, config: SolverConfig = SolverConfig()) -> OptimizationResult:
+def optimize(
+    problem: OptimizationProblem, config: SolverConfig = SolverConfig()
+) -> OptimizationResult:
     baseline_cal, baseline_km, baseline_status = _baseline_calendar(problem)
 
     h_cal, h_meta = None, None
@@ -125,7 +141,9 @@ def optimize(problem: OptimizationProblem, config: SolverConfig = SolverConfig()
     hint_cal = (
         h_cal
         if h_cal is not None
-        and not SolutionValidator.validate(h_cal, problem.scenario, problem.weekends, problem.weather)
+        and not SolutionValidator.validate(
+            h_cal, problem.scenario, problem.weekends, problem.weather
+        )
         else None
     )
 
@@ -147,8 +165,11 @@ def optimize(problem: OptimizationProblem, config: SolverConfig = SolverConfig()
             time_limit_s=min(config.time_limit_s, remaining),
             seed=s,
             seeds=(s,),
-            deadline_monotonic=(min(config.deadline_monotonic, time.monotonic() + config.time_limit_s)
-                                if config.deadline_monotonic is not None else None),
+            deadline_monotonic=(
+                min(config.deadline_monotonic, time.monotonic() + config.time_limit_s)
+                if config.deadline_monotonic is not None
+                else None
+            ),
             num_workers=config.num_workers,
             use_hint=config.use_hint,
             # First seed solves WITH presolve: locks the clean hint almost
@@ -160,12 +181,21 @@ def optimize(problem: OptimizationProblem, config: SolverConfig = SolverConfig()
         cal_s, meta_s = ORToolsSolver().solve(problem, seed_cfg, hint_calendar=hint_cal)
         last_meta = meta_s
         km_s = None
-        if cal_s is not None and not SolutionValidator.validate(cal_s, problem.scenario, problem.weekends, problem.weather):
+        if cal_s is not None and not SolutionValidator.validate(
+            cal_s, problem.scenario, problem.weekends, problem.weather
+        ):
             km_s = order_distance_km(race_order(cal_s), problem.circuits)
             if km_s < best_km:
                 best_km, o_cal, o_meta = km_s, cal_s, meta_s
-        attempts.append({"seed": s, "status": meta_s.status.value, "km": km_s,
-                         "time_limit_s": seed_cfg.time_limit_s, "runtime_ms": meta_s.runtime_ms})
+        attempts.append(
+            {
+                "seed": s,
+                "status": meta_s.status.value,
+                "km": km_s,
+                "time_limit_s": seed_cfg.time_limit_s,
+                "runtime_ms": meta_s.runtime_ms,
+            }
+        )
     if o_meta is None:
         o_meta = last_meta or SolverMetadata(
             solver_name="ortools",
@@ -207,7 +237,9 @@ def optimize(problem: OptimizationProblem, config: SolverConfig = SolverConfig()
         best = (baseline_cal, baseline_meta, SolveStatus.FEASIBLE, "baseline")
         best_km = baseline_km
     if h_cal is not None:
-        h_viol = SolutionValidator.validate(h_cal, problem.scenario, problem.weekends, problem.weather)
+        h_viol = SolutionValidator.validate(
+            h_cal, problem.scenario, problem.weekends, problem.weather
+        )
         if not h_viol:
             h_km = order_distance_km(race_order(h_cal), problem.circuits)
             if h_km < best_km:
@@ -230,7 +262,9 @@ def optimize(problem: OptimizationProblem, config: SolverConfig = SolverConfig()
 
     if best is not None:
         cal, meta, status, origin = best
-        diagnostics["solver_disagreement"] = any(a["status"] == SolveStatus.INFEASIBLE.value for a in attempts)
+        diagnostics["solver_disagreement"] = any(
+            a["status"] == SolveStatus.INFEASIBLE.value for a in attempts
+        )
         return OptimizationResult(
             status=status,
             calendar=cal,

@@ -1,4 +1,5 @@
 """Circuit entity + loader (P0-05). IDs are immutable canonical identifiers."""
+
 from __future__ import annotations
 
 import json

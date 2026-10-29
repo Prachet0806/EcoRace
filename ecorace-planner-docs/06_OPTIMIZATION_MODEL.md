@@ -104,8 +104,7 @@ The implementation may use a routing formulation or an assignment/sequence formu
 
 ```python
 class CalendarSolver(Protocol):
-    def solve(self, problem: OptimizationProblem) -> SolverResult:
-        ...
+    def solve(self, problem: OptimizationProblem) -> SolverResult: ...
 ```
 
 Implementations may include:

@@ -4,6 +4,7 @@ Checks every hard invariant against domain inputs: count, membership,
 uniqueness, occupancy (implicit in Calendar), streak windows, weather,
 horizon membership.
 """
+
 from __future__ import annotations
 
 from ecorace.domain.calendar.calendar import Calendar
@@ -39,7 +40,13 @@ class SolutionValidator:
         seen: set[str] = set()
         for wid, cid in calendar.assignment.items():
             if wid not in horizon_ids:
-                out.append(Violation(code="UNKNOWN_WEEKEND", message=f"{wid} outside horizon", weekend_id=wid))
+                out.append(
+                    Violation(
+                        code="UNKNOWN_WEEKEND",
+                        message=f"{wid} outside horizon",
+                        weekend_id=wid,
+                    )
+                )
             if cid in seen:
                 out.append(
                     Violation(
@@ -96,7 +103,9 @@ class SolutionValidator:
                     )
                 )
 
-        occupied_months = {w.friday.month for w in weekends if w.id in calendar.assignment}
+        occupied_months = {
+            w.friday.month for w in weekends if w.id in calendar.assignment
+        }
         for month, idxs in covered_months(weekends, break_ids).items():
             if month not in occupied_months:
                 first = weekends[idxs[0]].id

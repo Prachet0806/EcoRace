@@ -2,6 +2,7 @@
 
 Field names mirror docs/08_API_CONTRACT.md §3-§4.
 """
+
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field

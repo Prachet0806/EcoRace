@@ -3,10 +3,11 @@
 Owns the use-case flow (load inputs -> validate -> optimize -> present).
 No HTTP, no solver syntax, no SQL here — only calls into domain/optimization/infrastructure adapters.
 """
+
 from __future__ import annotations
 
-import uuid
 import time
+import uuid
 from dataclasses import dataclass, field
 
 from ecorace.analytics.distance import haversine_km
@@ -75,7 +76,9 @@ def create_scenario(
     try:
         validate_scenario(scenario, set(circuits))
     except _DOMAIN_ERRORS as e:
-        raise AppError(code=_domain_error_code(e), message=str(e), status_code=422) from e
+        raise AppError(
+            code=_domain_error_code(e), message=str(e), status_code=422
+        ) from e
     result = {
         "scenario_id": f"scn_{uuid.uuid4().hex}",
         "race_count": race_count,
@@ -123,37 +126,75 @@ def run_optimization(
         pin_end_to_dec_week1=pin_end_to_dec_week1,
     )
     try:
-        problem = build_problem(scenario, circuits, weekends, weather, data_version=circuits_tag)
+        problem = build_problem(
+            scenario, circuits, weekends, weather, data_version=circuits_tag
+        )
     except _DOMAIN_ERRORS as e:
-        raise AppError(code=_domain_error_code(e), message=str(e), status_code=422) from e
+        raise AppError(
+            code=_domain_error_code(e), message=str(e), status_code=422
+        ) from e
     except InfeasibleProblem as e:
-        raise AppError(code="SCENARIO_INFEASIBLE", message=str(e), status_code=422) from e
+        raise AppError(
+            code="SCENARIO_INFEASIBLE", message=str(e), status_code=422
+        ) from e
 
     seeds = tuple(seed + i for i in range(3))
-    result = optimize(problem, SolverConfig(time_limit_s=total_budget_s / 3.0, seed=seed, seeds=seeds,
-                                            deadline_monotonic=deadline))
-    run_result = present_result(result, scenario, weekends, weather, circuits_tag, total_budget_s, seeds,
-                                int((time.monotonic() - started) * 1000))
+    result = optimize(
+        problem,
+        SolverConfig(
+            time_limit_s=total_budget_s / 3.0,
+            seed=seed,
+            seeds=seeds,
+            deadline_monotonic=deadline,
+        ),
+    )
+    run_result = present_result(
+        result,
+        scenario,
+        weekends,
+        weather,
+        circuits_tag,
+        total_budget_s,
+        seeds,
+        int((time.monotonic() - started) * 1000),
+    )
     if scenario_id:
         run_result["scenario_id"] = scenario_id
     return run_result
 
 
-def present_result(result: OptimizationResult, scenario: Scenario, problem_weekends, weather,
-                   circuits_tag: str, total_budget_s: float, seeds: tuple[int, ...],
-                   total_runtime_ms: int) -> dict:
+def present_result(
+    result: OptimizationResult,
+    scenario: Scenario,
+    problem_weekends,
+    weather,
+    circuits_tag: str,
+    total_budget_s: float,
+    seeds: tuple[int, ...],
+    total_runtime_ms: int,
+) -> dict:
     circuits, _ = data_loader.circuits_bundle()
     if result.status == SolveStatus.INFEASIBLE:
-        raise AppError(code="SCENARIO_INFEASIBLE", message="No feasible calendar satisfies the configured constraints.", status_code=422)
+        raise AppError(
+            code="SCENARIO_INFEASIBLE",
+            message="No feasible calendar satisfies the configured constraints.",
+            status_code=422,
+        )
     if result.status == SolveStatus.SOLVER_TIMEOUT:
         raise AppError(
             code="SOLVER_TIMEOUT",
             message="Solver exhausted its budget without a solution.",
-            details=[{"runtime_ms": result.solver.runtime_ms if result.solver else None}],
+            details=[
+                {"runtime_ms": result.solver.runtime_ms if result.solver else None}
+            ],
             status_code=504,
         )
     if result.status == SolveStatus.SOLVER_FAILURE or result.calendar is None:
-        raise AppError(code="SOLVER_FAILURE", message="Solver failed without a usable result.", status_code=500)
+        raise AppError(
+            code="SOLVER_FAILURE",
+            message="Solver failed without a usable result.",
+            status_code=500,
+        )
 
     cal: Calendar = result.calendar
     pos = {w.id: n for n, w in enumerate(problem_weekends)}
@@ -184,18 +225,31 @@ def present_result(result: OptimizationResult, scenario: Scenario, problem_weeke
                 "to_race_id": b["race_id"],
                 "from_circuit_id": a["circuit_id"],
                 "to_circuit_id": b["circuit_id"],
-                "distance_km": round(haversine_km(a["latitude"], a["longitude"], b["latitude"], b["longitude"]), 2),
+                "distance_km": round(
+                    haversine_km(
+                        a["latitude"], a["longitude"], b["latitude"], b["longitude"]
+                    ),
+                    2,
+                ),
             }
         )
     weekend_ids = [w.id for w in problem_weekends]
     breaks = [w.id for w in problem_weekends if w.id not in cal.assignment]
     violations = [
-        {"code": v.code, "message": v.message, "weekend_id": v.weekend_id, "circuit_id": v.circuit_id}
+        {
+            "code": v.code,
+            "message": v.message,
+            "weekend_id": v.weekend_id,
+            "circuit_id": v.circuit_id,
+        }
         for v in SolutionValidator.validate(cal, scenario, problem_weekends, weather)
     ]
     saving = None
-    if (result.diagnostics.get("baseline_status") == "ok" and result.total_distance_km is not None
-            and result.baseline_distance_km is not None):
+    if (
+        result.diagnostics.get("baseline_status") == "ok"
+        and result.total_distance_km is not None
+        and result.baseline_distance_km is not None
+    ):
         saving = round(result.baseline_distance_km - result.total_distance_km, 2)
     return {
         "run_id": f"run_{uuid.uuid4().hex}",
@@ -212,17 +266,82 @@ def present_result(result: OptimizationResult, scenario: Scenario, problem_weeke
         "segments": segments,
         "metrics": {
             "total_distance_km": round(result.total_distance_km, 2),
-            "baseline_distance_km": round(result.baseline_distance_km, 2) if result.baseline_distance_km else None,
+            "baseline_distance_km": round(result.baseline_distance_km, 2)
+            if result.baseline_distance_km
+            else None,
             "saving_km": saving,
             "baseline_status": result.diagnostics.get("baseline_status"),
         },
         "constraints": [
-            {"name": "weather", "satisfied": not any(v["code"] == "WEATHER_INFEASIBLE" for v in violations), "violations": [v for v in violations if v["code"] == "WEATHER_INFEASIBLE"]},
-            {"name": "max_consecutive", "satisfied": not any(v["code"] == "STREAK_VIOLATION" for v in violations), "violations": [v for v in violations if v["code"] == "STREAK_VIOLATION"]},
-            {"name": "summer_break", "satisfied": not any(v["code"] == "SUMMER_BREAK_VIOLATION" for v in violations), "violations": [v for v in violations if v["code"] == "SUMMER_BREAK_VIOLATION"]},
-            {"name": "monthly_minimum", "satisfied": not any(v["code"] == "MONTHLY_MINIMUM_VIOLATION" for v in violations), "violations": [v for v in violations if v["code"] == "MONTHLY_MINIMUM_VIOLATION"]},
-            {"name": "dec_end_pin", "satisfied": not any(v["code"] == "DEC_PIN_VIOLATION" for v in violations), "violations": [v for v in violations if v["code"] == "DEC_PIN_VIOLATION"]},
-            {"name": "race_count_unique", "satisfied": not any(v["code"] in ("RACE_COUNT_MISMATCH", "DUPLICATE_CIRCUIT", "UNSELECTED_CIRCUIT", "UNKNOWN_WEEKEND") for v in violations), "violations": [v for v in violations if v["code"] in ("RACE_COUNT_MISMATCH", "DUPLICATE_CIRCUIT", "UNSELECTED_CIRCUIT", "UNKNOWN_WEEKEND")]},
+            {
+                "name": "weather",
+                "satisfied": not any(
+                    v["code"] == "WEATHER_INFEASIBLE" for v in violations
+                ),
+                "violations": [
+                    v for v in violations if v["code"] == "WEATHER_INFEASIBLE"
+                ],
+            },
+            {
+                "name": "max_consecutive",
+                "satisfied": not any(
+                    v["code"] == "STREAK_VIOLATION" for v in violations
+                ),
+                "violations": [
+                    v for v in violations if v["code"] == "STREAK_VIOLATION"
+                ],
+            },
+            {
+                "name": "summer_break",
+                "satisfied": not any(
+                    v["code"] == "SUMMER_BREAK_VIOLATION" for v in violations
+                ),
+                "violations": [
+                    v for v in violations if v["code"] == "SUMMER_BREAK_VIOLATION"
+                ],
+            },
+            {
+                "name": "monthly_minimum",
+                "satisfied": not any(
+                    v["code"] == "MONTHLY_MINIMUM_VIOLATION" for v in violations
+                ),
+                "violations": [
+                    v for v in violations if v["code"] == "MONTHLY_MINIMUM_VIOLATION"
+                ],
+            },
+            {
+                "name": "dec_end_pin",
+                "satisfied": not any(
+                    v["code"] == "DEC_PIN_VIOLATION" for v in violations
+                ),
+                "violations": [
+                    v for v in violations if v["code"] == "DEC_PIN_VIOLATION"
+                ],
+            },
+            {
+                "name": "race_count_unique",
+                "satisfied": not any(
+                    v["code"]
+                    in (
+                        "RACE_COUNT_MISMATCH",
+                        "DUPLICATE_CIRCUIT",
+                        "UNSELECTED_CIRCUIT",
+                        "UNKNOWN_WEEKEND",
+                    )
+                    for v in violations
+                ),
+                "violations": [
+                    v
+                    for v in violations
+                    if v["code"]
+                    in (
+                        "RACE_COUNT_MISMATCH",
+                        "DUPLICATE_CIRCUIT",
+                        "UNSELECTED_CIRCUIT",
+                        "UNKNOWN_WEEKEND",
+                    )
+                ],
+            },
         ],
         "solver": {
             "name": result.solver.solver_name if result.solver else None,
@@ -230,7 +349,9 @@ def present_result(result: OptimizationResult, scenario: Scenario, problem_weeke
             "runtime_ms": result.solver.runtime_ms if result.solver else None,
             "seed": result.solver.seed if result.solver else None,
             "status": result.solver.status.value if result.solver else None,
-            "optimality_proven": result.solver.optimality_proven if result.solver else False,
+            "optimality_proven": result.solver.optimality_proven
+            if result.solver
+            else False,
             "origin": result.diagnostics.get("origin"),
         },
         "data_version": circuits_tag,

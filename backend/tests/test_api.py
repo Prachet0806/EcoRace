@@ -1,7 +1,7 @@
 """P2 gate: HTTP integration, stable error codes, response contracts, CORS."""
-from ecorace.infrastructure import data_loader
-from ecorace.infrastructure import persistence
+
 from ecorace.application import optimization_service as svc
+from ecorace.infrastructure import data_loader, persistence
 from ecorace.interface.http.app import create_app
 from fastapi.testclient import TestClient
 
@@ -33,14 +33,23 @@ def test_circuits_expose_venue_provenance():
     # silently breaks it, so pin them at the API level.
     body = client.get("/api/v1/circuits").json()
     for c in body["circuits"]:
-        assert "f1_current_2026" in c and "f1_hosted_seasons" in c and "venue_source" in c
+        assert (
+            "f1_current_2026" in c and "f1_hosted_seasons" in c and "venue_source" in c
+        )
     official = [c["id"] for c in body["circuits"] if c["f1_current_2026"] is True]
     assert len(official) == 24
 
 
 def test_create_scenario_ok():
-    body = svc.create_scenario(20, IDS[:20], 2026, max_consecutive=2,
-                               summer_break_start=19, summer_break_end=21, pin_end_to_dec_week1=True)
+    body = svc.create_scenario(
+        20,
+        IDS[:20],
+        2026,
+        max_consecutive=2,
+        summer_break_start=19,
+        summer_break_end=21,
+        pin_end_to_dec_week1=True,
+    )
     assert body["scenario_id"].startswith("scn_")
     assert body["weekend_count"] == 40
     assert body["horizon"] == {"start": "2026-03-06", "end": "2026-12-04"}
@@ -59,12 +68,35 @@ def test_scenario_error_codes():
         ({"race_count": 20, "circuit_ids": [IDS[0]] * 20}, "DUPLICATE_CIRCUIT"),
         ({"race_count": 20, "circuit_ids": ["nope"] + IDS[1:20]}, "UNKNOWN_CIRCUIT_ID"),
         ({"race_count": 19, "circuit_ids": IDS[:19]}, "INVALID_RACE_COUNT"),
-        ({"race_count": 20, "circuit_ids": IDS[:20], "season_year": 1999}, "INVALID_REQUEST"),
-        ({"race_count": 20, "circuit_ids": IDS[:20], "max_consecutive": 0}, "INVALID_REQUEST"),
-        ({"race_count": 20, "circuit_ids": IDS[:20], "max_consecutive": 1}, "INVALID_REQUEST"),
-        ({"race_count": 20, "circuit_ids": IDS[:20], "max_consecutive": 8}, "INVALID_REQUEST"),
-        ({"race_count": 20, "circuit_ids": IDS[:20], "summer_break_start": 21, "summer_break_end": 19}, "INVALID_SUMMER_BREAK"),
-        ({"race_count": 20, "circuit_ids": IDS[:20], "summer_break_start": 19}, "INVALID_SUMMER_BREAK"),
+        (
+            {"race_count": 20, "circuit_ids": IDS[:20], "season_year": 1999},
+            "INVALID_REQUEST",
+        ),
+        (
+            {"race_count": 20, "circuit_ids": IDS[:20], "max_consecutive": 0},
+            "INVALID_REQUEST",
+        ),
+        (
+            {"race_count": 20, "circuit_ids": IDS[:20], "max_consecutive": 1},
+            "INVALID_REQUEST",
+        ),
+        (
+            {"race_count": 20, "circuit_ids": IDS[:20], "max_consecutive": 8},
+            "INVALID_REQUEST",
+        ),
+        (
+            {
+                "race_count": 20,
+                "circuit_ids": IDS[:20],
+                "summer_break_start": 21,
+                "summer_break_end": 19,
+            },
+            "INVALID_SUMMER_BREAK",
+        ),
+        (
+            {"race_count": 20, "circuit_ids": IDS[:20], "summer_break_start": 19},
+            "INVALID_SUMMER_BREAK",
+        ),
     ]
     for payload, code in cases:
         r = client.post("/api/v1/optimization/runs", json=payload)
@@ -89,11 +121,16 @@ def test_run_happy_path_contract():
     assert cal["race_count"] == 20 and len(cal["races"]) == 20
     assert cal["race_count"] + cal["break_count"] == cal["weekend_count"] == 40
     assert cal["max_streak"] <= 3
-    assert [x["race_id"] for x in cal["races"]] == [f"race-{i + 1:02d}" for i in range(20)]
+    assert [x["race_id"] for x in cal["races"]] == [
+        f"race-{i + 1:02d}" for i in range(20)
+    ]
     assert len(body["segments"]) == 19
     assert body["segments"][0]["segment_id"] == "seg-01"
     if body["metrics"]["baseline_status"] == "ok":
-        assert body["metrics"]["total_distance_km"] <= body["metrics"]["baseline_distance_km"]
+        assert (
+            body["metrics"]["total_distance_km"]
+            <= body["metrics"]["baseline_distance_km"]
+        )
     else:
         assert body["metrics"]["saving_km"] is None
     assert all(c["satisfied"] for c in body["constraints"])
@@ -104,7 +141,10 @@ def test_run_happy_path_contract():
     assert body["provenance"]["seed_schedule"] == [0, 1, 2]
     # Route geometry sanity: segment endpoints match race order.
     for seg, a, b in zip(body["segments"], cal["races"], cal["races"][1:]):
-        assert (seg["from_circuit_id"], seg["to_circuit_id"]) == (a["circuit_id"], b["circuit_id"])
+        assert (seg["from_circuit_id"], seg["to_circuit_id"]) == (
+            a["circuit_id"],
+            b["circuit_id"],
+        )
 
 
 def test_run_with_knobs_contract():
@@ -126,7 +166,14 @@ def test_run_with_knobs_contract():
     assert cal["max_streak"] <= 2
     assert cal["races"][-1]["weekend_id"] == "2026-12-04"
     names = {c["name"] for c in body["constraints"]}
-    assert {"weather", "max_consecutive", "summer_break", "monthly_minimum", "dec_end_pin", "race_count_unique"} <= names
+    assert {
+        "weather",
+        "max_consecutive",
+        "summer_break",
+        "monthly_minimum",
+        "dec_end_pin",
+        "race_count_unique",
+    } <= names
     assert all(c["satisfied"] for c in body["constraints"])
     assert body["provenance"]["scenario"]["max_consecutive"] == 2
     assert body["provenance"]["scenario"]["summer_break_start"] == 19
@@ -159,7 +206,9 @@ def test_run_roundtrip_and_404():
 
 
 def test_run_error_codes_fast():
-    r = client.post("/api/v1/optimization/runs", json={"race_count": 22, "circuit_ids": IDS[:20]})
+    r = client.post(
+        "/api/v1/optimization/runs", json={"race_count": 22, "circuit_ids": IDS[:20]}
+    )
     assert r.status_code == 422
     assert r.json()["error"]["code"] == "INSUFFICIENT_CIRCUITS"
     r = client.post("/api/v1/optimization/runs", json={"circuit_ids": IDS[:20]})

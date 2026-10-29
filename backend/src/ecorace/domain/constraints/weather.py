@@ -1,14 +1,21 @@
 """Weather feasibility contract (P0-04). Domain sees only is_feasible()."""
+
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 from pathlib import Path
 
 
 class WeatherPolicy:
-    def __init__(self, version: str, feasibility: dict[str, dict[str, bool]], default: bool = True,
-                 source_hash: str | None = None, synthetic: bool = False):
+    def __init__(
+        self,
+        version: str,
+        feasibility: dict[str, dict[str, bool]],
+        default: bool = True,
+        source_hash: str | None = None,
+        synthetic: bool = False,
+    ):
         self.version = version
         self._feasibility = feasibility
         self._default = default
@@ -23,6 +30,10 @@ class WeatherPolicy:
         contents = Path(path).read_bytes()
         raw = json.loads(contents.decode("utf-8"))
         feasibility = raw.get("feasibility", {})
-        return cls(version=raw.get("version", "unknown"), feasibility=feasibility,
-                   default=raw.get("defaults", True), source_hash=hashlib.sha256(contents).hexdigest(),
-                   synthetic=raw.get("synthetic", False))
+        return cls(
+            version=raw.get("version", "unknown"),
+            feasibility=feasibility,
+            default=raw.get("defaults", True),
+            source_hash=hashlib.sha256(contents).hexdigest(),
+            synthetic=raw.get("synthetic", False),
+        )

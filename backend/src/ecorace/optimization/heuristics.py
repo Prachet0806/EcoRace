@@ -2,6 +2,7 @@
 
 Always validator-clean or not returned. Doubles as the OR-Tools hint source.
 """
+
 from __future__ import annotations
 
 import time
@@ -24,7 +25,9 @@ from ecorace.optimization.model import (
 from ecorace.optimization.validator import SolutionValidator
 
 
-def nearest_neighbor(order_ids: list[str], matrix: list[list[float]], start: int) -> list[int]:
+def nearest_neighbor(
+    order_ids: list[str], matrix: list[list[float]], start: int
+) -> list[int]:
     n = len(order_ids)
     unvisited = set(range(n))
     path = [start]
@@ -101,7 +104,8 @@ def place_with_monthly_cover(
         raise BaselineInfeasible("fewer circuits than covered months")
 
     open_ids = {
-        m: [weekends[wi].id for wi in covered[m] if weekends[wi].id not in break_ids] for m in months
+        m: [weekends[wi].id for wi in covered[m] if weekends[wi].id not in break_ids]
+        for m in months
     }
     if months:
         # Contiguous chunk sizes proportional to open weekends per month.
@@ -133,21 +137,29 @@ def place_with_monthly_cover(
                 if try_place(c, open_ids[m]):
                     continue
                 if not try_place(c, spill):
-                    raise BaselineInfeasible(f"no feasible weekend for {c} in monthly cover")
+                    raise BaselineInfeasible(
+                        f"no feasible weekend for {c} in monthly cover"
+                    )
             idx += s
     else:
         for c in placeable:
             if not try_place(c, [w.id for w in weekends]):
-                raise BaselineInfeasible(f"no feasible weekend for {c} in baseline order")
+                raise BaselineInfeasible(
+                    f"no feasible weekend for {c} in baseline order"
+                )
     if last_weekend_id:
         assert reserve_last is not None
         if (
             last_weekend_id in break_ids
             or last_weekend_id in occupied
             or not weather.is_feasible(reserve_last, last_weekend_id)
-            or would_break_streak(occupied_ids, last_weekend_id, weekends, max_consecutive)
+            or would_break_streak(
+                occupied_ids, last_weekend_id, weekends, max_consecutive
+            )
         ):
-            raise BaselineInfeasible(f"no feasible weekend for {reserve_last} in baseline order")
+            raise BaselineInfeasible(
+                f"no feasible weekend for {reserve_last} in baseline order"
+            )
         occupied[last_weekend_id] = reserve_last
         occupied_ids.add(last_weekend_id)
     return Calendar(weekends=tuple(weekends), assignment=occupied)
@@ -169,7 +181,10 @@ class HeuristicSolver:
         break_ids = summer_break_weekend_ids(scen, problem.weekends)
         last_id = problem.weekends[-1].id if scen.pin_end_to_dec_week1 else None
         for start in range(len(ids)):
-            if config.deadline_monotonic is not None and time.monotonic() >= config.deadline_monotonic:
+            if (
+                config.deadline_monotonic is not None
+                and time.monotonic() >= config.deadline_monotonic
+            ):
                 break
             order_idx = two_opt(nearest_neighbor(ids, matrix, start), matrix)
             order = [ids[i] for i in order_idx]
@@ -184,7 +199,12 @@ class HeuristicSolver:
                     last_weekend_id=last_id,
                 ),
                 lambda: place_with_monthly_cover(
-                    order, weekends, problem.weather, scen.max_consecutive, break_ids, last_id
+                    order,
+                    weekends,
+                    problem.weather,
+                    scen.max_consecutive,
+                    break_ids,
+                    last_id,
                 ),
             ):
                 try:
@@ -192,7 +212,9 @@ class HeuristicSolver:
                 except BaselineInfeasible:
                     continue
             for cal in cals:
-                if SolutionValidator.validate(cal, scen, problem.weekends, problem.weather):
+                if SolutionValidator.validate(
+                    cal, scen, problem.weekends, problem.weather
+                ):
                     continue  # never prefer a dirty calendar, even a short one
                 km = order_distance_km(
                     [cal.assignment[w.id] for w in weekends if w.id in cal.assignment],

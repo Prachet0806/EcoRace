@@ -4,6 +4,7 @@ Weekend = {Friday, Saturday, Sunday}, id = Friday ISO date.
 Season Y: first Friday >= Mar 1 .. first Friday with Sunday >= Dec 1, step 7d.
 The final Friday can be in November when its weekend includes December 1.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -68,7 +69,9 @@ def season_weekends(year: int) -> tuple[RaceWeekend, ...]:
     return tuple(weekends)
 
 
-def summer_break_weekend_ids(scenario, weekends: tuple[RaceWeekend, ...]) -> frozenset[str]:
+def summer_break_weekend_ids(
+    scenario, weekends: tuple[RaceWeekend, ...]
+) -> frozenset[str]:
     """Weekend ids covered by the scenario's summer break window.
 
     Indices are 0-based into the season weekend list and clamped to the

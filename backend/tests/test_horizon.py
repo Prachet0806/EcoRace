@@ -1,4 +1,5 @@
 """Phase 0 gate: deterministic weekend generation + 2025/2026 goldens."""
+
 from datetime import timedelta
 
 from ecorace.domain.calendar.weekend import season_weekends

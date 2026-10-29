@@ -1,4 +1,5 @@
 """Structured JSON logging + request ID middleware."""
+
 from __future__ import annotations
 
 import logging
@@ -14,7 +15,12 @@ request_id_var: ContextVar[str] = ContextVar("request_id", default="")
 
 
 class EcoraceJsonFormatter(JsonFormatter):
-    def add_fields(self, log_record: dict[str, Any], record: logging.LogRecord, message_dict: dict[str, Any]) -> None:
+    def add_fields(
+        self,
+        log_record: dict[str, Any],
+        record: logging.LogRecord,
+        message_dict: dict[str, Any],
+    ) -> None:
         super().add_fields(log_record, record, message_dict)
         log_record["timestamp"] = self.formatTime(record)
         log_record["level"] = record.levelname

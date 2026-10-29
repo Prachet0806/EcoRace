@@ -1,4 +1,5 @@
 """HTTP routes. Parsing + status mapping only — no domain/solver logic."""
+
 from __future__ import annotations
 
 import os
@@ -19,7 +20,10 @@ except ImportError:
 
 router = APIRouter(prefix="/api/v1")
 
-limiter = Limiter(key_func=get_remote_address, default_limits=[os.environ.get("RATE_LIMIT_DEFAULT", "60/minute")])
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=[os.environ.get("RATE_LIMIT_DEFAULT", "60/minute")],
+)
 
 
 @router.get("/health")
@@ -56,22 +60,47 @@ def create_run(body: RunRequest, request: Request) -> dict:
         return JSONResponse(
             status_code=503,
             headers={"Retry-After": "5"},
-            content=envelope("SOLVER_OVERLOADED", "Solver temporarily unavailable due to repeated failures. Please retry shortly.", []),
+            content=envelope(
+                "SOLVER_OVERLOADED",
+                "Solver temporarily unavailable due to repeated failures. Please retry shortly.",
+                [],
+            ),
         )
     if not request.app.state.solver_slots.acquire(blocking=False):
-        return JSONResponse(status_code=503, headers={"Retry-After": "5"},
-                            content=envelope("SOLVER_OVERLOADED", "All solver slots are busy. Retry shortly."))
+        return JSONResponse(
+            status_code=503,
+            headers={"Retry-After": "5"},
+            content=envelope(
+                "SOLVER_OVERLOADED", "All solver slots are busy. Retry shortly."
+            ),
+        )
     try:
-        budget = body.budget_s if body.budget_s is not None else float(request.app.state.solver_budget_s)
+        budget = (
+            body.budget_s
+            if body.budget_s is not None
+            else float(request.app.state.solver_budget_s)
+        )
         scenario = svc.create_scenario(
-            body.race_count, body.circuit_ids, body.season_year, body.max_consecutive,
-            body.summer_break_start, body.summer_break_end, body.pin_end_to_dec_week1, persist=False,
+            body.race_count,
+            body.circuit_ids,
+            body.season_year,
+            body.max_consecutive,
+            body.summer_break_start,
+            body.summer_break_end,
+            body.pin_end_to_dec_week1,
+            persist=False,
         )
         try:
             result = svc.run_optimization(
-                body.race_count, body.circuit_ids, body.season_year, budget, body.seed,
-                scenario_id=scenario["scenario_id"], max_consecutive=body.max_consecutive,
-                summer_break_start=body.summer_break_start, summer_break_end=body.summer_break_end,
+                body.race_count,
+                body.circuit_ids,
+                body.season_year,
+                budget,
+                body.seed,
+                scenario_id=scenario["scenario_id"],
+                max_consecutive=body.max_consecutive,
+                summer_break_start=body.summer_break_start,
+                summer_break_end=body.summer_break_end,
                 pin_end_to_dec_week1=body.pin_end_to_dec_week1,
             )
         except svc.AppError as exc:
@@ -106,12 +135,19 @@ def season_weekends(year: int, request: Request) -> dict:
     try:
         weekends = data_loader.season(year)
     except ValueError as e:
-        return JSONResponse(status_code=422, content=envelope("INVALID_HORIZON", str(e)))
+        return JSONResponse(
+            status_code=422, content=envelope("INVALID_HORIZON", str(e))
+        )
     return {
         "year": year,
         "count": len(weekends),
         "weekends": [
-            {"id": w.id, "friday": w.friday.isoformat(), "saturday": w.saturday.isoformat(), "sunday": w.sunday.isoformat()}
+            {
+                "id": w.id,
+                "friday": w.friday.isoformat(),
+                "saturday": w.saturday.isoformat(),
+                "sunday": w.sunday.isoformat(),
+            }
             for w in weekends
         ],
     }

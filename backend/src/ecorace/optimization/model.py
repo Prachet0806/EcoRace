@@ -2,6 +2,7 @@
 
 Pure data + the shared distance matrix. No solver imports here.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -30,7 +31,9 @@ class SolverConfig:
     deadline_monotonic: float | None = None
     seed: int = 0
     seeds: tuple[int, ...] = ()  # empty = requested seed and its next two values
-    num_workers: int = 1  # 1 = deterministic; raise only for speed at cost of reproducibility
+    num_workers: int = (
+        1  # 1 = deterministic; raise only for speed at cost of reproducibility
+    )
     use_hint: bool = True
     presolve: bool = False
 
@@ -76,7 +79,9 @@ class OptimizationResult:
     diagnostics: dict = field(default_factory=dict, compare=False)
 
 
-def build_distance_matrix(circuits: dict[str, Circuit], order: list[str]) -> list[list[float]]:
+def build_distance_matrix(
+    circuits: dict[str, Circuit], order: list[str]
+) -> list[list[float]]:
     """Symmetric Haversine km matrix aligned with `order` (float, unrounded)."""
     n = len(order)
     mat = [[0.0] * n for _ in range(n)]
@@ -92,6 +97,4 @@ def build_distance_matrix(circuits: dict[str, Circuit], order: list[str]) -> lis
 
 def order_distance_km(order: list[str], circuits: dict[str, Circuit]) -> float:
     pts = [(circuits[c].latitude, circuits[c].longitude) for c in order]
-    return sum(
-        haversine_km(*pts[i], *pts[i + 1]) for i in range(len(pts) - 1)
-    )
+    return sum(haversine_km(*pts[i], *pts[i + 1]) for i in range(len(pts) - 1))

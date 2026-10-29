@@ -19,6 +19,7 @@ Config (env):
   SOLVER_MAX_CONCURRENT: solver slots per process (default 1)
   ECORACE_DB_PATH: SQLite database path (default ./data/ecorace.db)
 """
+
 from __future__ import annotations
 
 import ipaddress
@@ -73,7 +74,13 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title="EcoRace Planner", version="0.1.0")
 
-    origins = [o.strip() for o in os.environ.get("ECORACE_CORS_ORIGINS", "http://localhost:3000").split(",") if o.strip()]
+    origins = [
+        o.strip()
+        for o in os.environ.get("ECORACE_CORS_ORIGINS", "http://localhost:3000").split(
+            ","
+        )
+        if o.strip()
+    ]
     allow_lan = os.environ.get("ECORACE_CORS_ALLOW_LAN", "1") != "0"
     if allow_lan:
         origins.extend(o for o in _lan_origins() if o not in origins)
@@ -96,10 +103,14 @@ def create_app() -> FastAPI:
 
     cb_threshold = int(os.environ.get("SOLVER_CIRCUIT_BREAKER_THRESHOLD", "5"))
     cb_cooldown = int(os.environ.get("SOLVER_CIRCUIT_BREAKER_COOLDOWN_S", "60"))
-    app.state.circuit_breaker = CircuitBreaker(failure_threshold=cb_threshold, cooldown_s=cb_cooldown)
+    app.state.circuit_breaker = CircuitBreaker(
+        failure_threshold=cb_threshold, cooldown_s=cb_cooldown
+    )
 
     app.state.solver_budget_s = float(os.environ.get("SOLVER_TIMEOUT_SECONDS", "30"))
-    app.state.solver_slots = threading.BoundedSemaphore(max(1, int(os.environ.get("SOLVER_MAX_CONCURRENT", "1"))))
+    app.state.solver_slots = threading.BoundedSemaphore(
+        max(1, int(os.environ.get("SOLVER_MAX_CONCURRENT", "1")))
+    )
 
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

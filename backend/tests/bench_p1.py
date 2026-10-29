@@ -3,6 +3,7 @@
 Extends BENCHMARK_P0 shape numbers with OR-Tools results at fixed seed.
 Sets the practical time/quality target for the MVP sync API.
 """
+
 import json
 import sys
 import time
@@ -44,8 +45,12 @@ def run_case(n: int, time_limit_s: float = 5.0, seed: int = 0) -> dict:
         "wall_ms": wall_ms,
         "solver_ms": res.solver.runtime_ms if res.solver else None,
         "optimality_proven": res.solver.optimality_proven if res.solver else False,
-        "optimized_km": round(res.total_distance_km, 2) if res.total_distance_km is not None else None,
-        "baseline_km": round(res.baseline_distance_km, 2) if res.baseline_distance_km is not None else None,
+        "optimized_km": round(res.total_distance_km, 2)
+        if res.total_distance_km is not None
+        else None,
+        "baseline_km": round(res.baseline_distance_km, 2)
+        if res.baseline_distance_km is not None
+        else None,
         "saving_km": saving,
     }
 
@@ -53,7 +58,17 @@ def run_case(n: int, time_limit_s: float = 5.0, seed: int = 0) -> dict:
 if __name__ == "__main__":
     results = [run_case(n) for n in (20, 22, 24)]
     out = ROOT / "docs" / "BENCHMARK_P1.json"
-    out.write_text(json.dumps({"phase": "P1-solver", "config": {"time_limit_s": 5.0, "seeds": [0, 1, 2]}, "results": results}, indent=2) + "\n")
+    out.write_text(
+        json.dumps(
+            {
+                "phase": "P1-solver",
+                "config": {"time_limit_s": 5.0, "seeds": [0, 1, 2]},
+                "results": results,
+            },
+            indent=2,
+        )
+        + "\n"
+    )
     for r in results:
         print(r)
     print(f"wrote {out}")

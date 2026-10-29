@@ -1,4 +1,5 @@
 """Distance engine (P0-06): Haversine km, float end-to-end, round only at presentation."""
+
 from __future__ import annotations
 
 import math

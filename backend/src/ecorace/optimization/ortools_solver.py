@@ -7,6 +7,7 @@ time-order makes the route a DAG — provably the same feasible set and costs.
 Domain code never imported here in reverse: this module depends on the domain,
 not vice versa.
 """
+
 from __future__ import annotations
 
 import time
@@ -53,7 +54,9 @@ class ORToolsSolver:
 
         model = cp_model.CpModel()
         s = [model.NewIntVar(0, n - 1, f"s[{k}]") for k in range(n)]
-        t = [model.NewIntVar(k, w - n + k, f"t[{k}]") for k in range(n)]  # increasing: room both sides
+        t = [
+            model.NewIntVar(k, w - n + k, f"t[{k}]") for k in range(n)
+        ]  # increasing: room both sides
         model.AddAllDifferent(s)
         for k in range(n - 1):
             model.Add(t[k + 1] >= t[k] + 1)
@@ -119,9 +122,17 @@ class ORToolsSolver:
         # Completeness matters: monthly membership bools must be hinted too —
         # partial hints stall first solutions (measured V1.1).
         if config.use_hint and hint_calendar is not None:
-            cal_order = [hint_calendar.assignment[x.id] for x in weekends if x.id in hint_calendar.assignment]
+            cal_order = [
+                hint_calendar.assignment[x.id]
+                for x in weekends
+                if x.id in hint_calendar.assignment
+            ]
             if sorted(cal_order) == sorted(ids):
-                hint_twi = [windex_of[x.id] for x in weekends if x.id in hint_calendar.assignment]
+                hint_twi = [
+                    windex_of[x.id]
+                    for x in weekends
+                    if x.id in hint_calendar.assignment
+                ]
                 hint_months = [weekends[twi].friday.month for twi in hint_twi]
                 for k, cid in enumerate(cal_order):
                     model.AddHint(s[k], index_of[cid])
@@ -132,15 +143,22 @@ class ORToolsSolver:
         solver = cp_model.CpSolver()
         remaining = (
             config.deadline_monotonic - time.monotonic()
-            if config.deadline_monotonic is not None else config.time_limit_s
+            if config.deadline_monotonic is not None
+            else config.time_limit_s
         )
         if remaining <= 0:
             return None, SolverMetadata(
-                solver_name=self.name, solver_version=_ORTOOLS_VERSION, seed=config.seed,
-                runtime_ms=int((time.perf_counter() - t0) * 1000), time_limit_s=0.0,
-                status=SolveStatus.SOLVER_TIMEOUT, data_version=problem.data_version,
+                solver_name=self.name,
+                solver_version=_ORTOOLS_VERSION,
+                seed=config.seed,
+                runtime_ms=int((time.perf_counter() - t0) * 1000),
+                time_limit_s=0.0,
+                status=SolveStatus.SOLVER_TIMEOUT,
+                data_version=problem.data_version,
             )
-        solver.parameters.max_time_in_seconds = min(max(config.time_limit_s, 0.0), remaining)
+        solver.parameters.max_time_in_seconds = min(
+            max(config.time_limit_s, 0.0), remaining
+        )
         solver.parameters.random_seed = config.seed
         solver.parameters.num_search_workers = config.num_workers
         # Presolve OFF by default: Probe can expand table/element encodings
@@ -166,10 +184,14 @@ class ORToolsSolver:
 
         if status == cp_model.OPTIMAL:
             cal = self._extract(solver, s, t, ids, weekends)
-            return cal, meta(SolveStatus.FEASIBLE_OPTIMAL, solver.ObjectiveValue() / 1000.0, True)
+            return cal, meta(
+                SolveStatus.FEASIBLE_OPTIMAL, solver.ObjectiveValue() / 1000.0, True
+            )
         if status == cp_model.FEASIBLE:
             cal = self._extract(solver, s, t, ids, weekends)
-            return cal, meta(SolveStatus.FEASIBLE_TIMEOUT, solver.ObjectiveValue() / 1000.0, False)
+            return cal, meta(
+                SolveStatus.FEASIBLE_TIMEOUT, solver.ObjectiveValue() / 1000.0, False
+            )
         if status == cp_model.INFEASIBLE:
             return None, meta(SolveStatus.INFEASIBLE, None, False)
         return None, meta(SolveStatus.SOLVER_TIMEOUT, None, False)

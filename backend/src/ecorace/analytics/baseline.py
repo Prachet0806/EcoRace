@@ -5,6 +5,7 @@ exclusions, optional pinned finale. Raises BaselineInfeasible if greedy
 placement fails. Greedy failure does NOT imply scenario infeasibility
 (documented contract).
 """
+
 from __future__ import annotations
 
 from ecorace.domain.calendar.calendar import Calendar
@@ -17,7 +18,10 @@ class BaselineInfeasible(Exception):
 
 
 def _would_break_streak(
-    occupied_ids: set[str], candidate: str, weekends: list[RaceWeekend], max_consecutive: int = 3
+    occupied_ids: set[str],
+    candidate: str,
+    weekends: list[RaceWeekend],
+    max_consecutive: int = 3,
 ) -> bool:
     order = [w.id for w in weekends]
     trial = sorted(occupied_ids | {candidate}, key=order.index)
@@ -46,8 +50,14 @@ def build_baseline(
 ) -> Calendar:
     occupied: dict[str, str] = {}
     occupied_ids: set[str] = set()
-    targets = circuit_ids_in_input_order[:-1] if last_weekend_id else circuit_ids_in_input_order
-    pool = [w for w in weekends if w.id not in forbidden_ids and w.id != last_weekend_id]
+    targets = (
+        circuit_ids_in_input_order[:-1]
+        if last_weekend_id
+        else circuit_ids_in_input_order
+    )
+    pool = [
+        w for w in weekends if w.id not in forbidden_ids and w.id != last_weekend_id
+    ]
     for circuit_id in targets:
         placed = False
         for w in pool:
@@ -62,19 +72,32 @@ def build_baseline(
             placed = True
             break
         if not placed:
-            raise BaselineInfeasible(f"no feasible weekend for {circuit_id} in baseline order")
+            raise BaselineInfeasible(
+                f"no feasible weekend for {circuit_id} in baseline order"
+            )
     if last_weekend_id:
         final = circuit_ids_in_input_order[-1]
-        if last_weekend_id in forbidden_ids or not weather.is_feasible(final, last_weekend_id):
-            raise BaselineInfeasible(f"no feasible weekend for {final} in baseline order")
-        if _would_break_streak(occupied_ids, last_weekend_id, weekends, max_consecutive):
-            raise BaselineInfeasible(f"no feasible weekend for {final} in baseline order")
+        if last_weekend_id in forbidden_ids or not weather.is_feasible(
+            final, last_weekend_id
+        ):
+            raise BaselineInfeasible(
+                f"no feasible weekend for {final} in baseline order"
+            )
+        if _would_break_streak(
+            occupied_ids, last_weekend_id, weekends, max_consecutive
+        ):
+            raise BaselineInfeasible(
+                f"no feasible weekend for {final} in baseline order"
+            )
         occupied[last_weekend_id] = final
     return Calendar(weekends=tuple(weekends), assignment=occupied)
 
 
 def would_break_streak(
-    occupied_ids: set[str], candidate: str, weekends: list[RaceWeekend], max_consecutive: int = 3
+    occupied_ids: set[str],
+    candidate: str,
+    weekends: list[RaceWeekend],
+    max_consecutive: int = 3,
 ) -> bool:
     """Public alias for cross-module use (heuristic monthly placement)."""
     return _would_break_streak(occupied_ids, candidate, weekends, max_consecutive)

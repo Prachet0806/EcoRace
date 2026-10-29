@@ -4,10 +4,11 @@ Reads versioned JSON from the data/ directory. Returns domain objects —
 never ORM rows (there is no database in MVP). UTF-8 always: venue names
 contain non-ASCII characters.
 """
+
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import os
 from functools import lru_cache
 from pathlib import Path

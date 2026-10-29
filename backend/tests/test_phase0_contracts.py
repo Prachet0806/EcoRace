@@ -1,4 +1,5 @@
 """P0 gate: 20/22/24 validation, insufficient/excess/duplicate/unknown, weather, streaks, uniqueness."""
+
 from pathlib import Path
 
 import pytest
@@ -31,23 +32,45 @@ def test_circuit_library_has_24_unique():
 
 def test_scenario_exact_match_20_22_24():
     for n in (20, 22, 24):
-        s = validate_scenario(Scenario(race_count=n, circuit_ids=tuple(IDS24[:n]), season_year=2026), set(CIRCUITS))
+        s = validate_scenario(
+            Scenario(race_count=n, circuit_ids=tuple(IDS24[:n]), season_year=2026),
+            set(CIRCUITS),
+        )
         assert s.race_count == n
 
 
 def test_insufficient_excess_duplicate_unknown_race_count():
     with pytest.raises(InsufficientCircuits):
-        validate_scenario(Scenario(race_count=22, circuit_ids=tuple(IDS24[:20]), season_year=2026), set(CIRCUITS))
+        validate_scenario(
+            Scenario(race_count=22, circuit_ids=tuple(IDS24[:20]), season_year=2026),
+            set(CIRCUITS),
+        )
     with pytest.raises(ExcessCircuits):
-        validate_scenario(Scenario(race_count=20, circuit_ids=tuple(IDS24[:22]), season_year=2026), set(CIRCUITS))
+        validate_scenario(
+            Scenario(race_count=20, circuit_ids=tuple(IDS24[:22]), season_year=2026),
+            set(CIRCUITS),
+        )
     with pytest.raises(DuplicateCircuit):
-        validate_scenario(Scenario(race_count=20, circuit_ids=tuple([IDS24[0]] * 20), season_year=2026), set(CIRCUITS))
+        validate_scenario(
+            Scenario(
+                race_count=20, circuit_ids=tuple([IDS24[0]] * 20), season_year=2026
+            ),
+            set(CIRCUITS),
+        )
     with pytest.raises(UnknownCircuit):
         validate_scenario(
-            Scenario(race_count=20, circuit_ids=tuple(["nope"] + IDS24[1:20]), season_year=2026), set(CIRCUITS)
+            Scenario(
+                race_count=20,
+                circuit_ids=tuple(["nope"] + IDS24[1:20]),
+                season_year=2026,
+            ),
+            set(CIRCUITS),
         )
     with pytest.raises(InvalidRaceCount):
-        validate_scenario(Scenario(race_count=19, circuit_ids=tuple(IDS24[:19]), season_year=2026), set(CIRCUITS))
+        validate_scenario(
+            Scenario(race_count=19, circuit_ids=tuple(IDS24[:19]), season_year=2026),
+            set(CIRCUITS),
+        )
 
 
 def test_weather_fixture_cells():
@@ -58,12 +81,17 @@ def test_weather_fixture_cells():
 def test_weather_forbidden_scheduling_detected():
     weekends = list(season_weekends(2026))
     cal = Calendar(weekends=tuple(weekends), assignment={weekends[0].id: "monza"})
-    assert WEATHER.is_feasible("monza", weekends[0].id) is False  # forbidden cell occupied
+    assert (
+        WEATHER.is_feasible("monza", weekends[0].id) is False
+    )  # forbidden cell occupied
 
 
 def _cal_with_run(length: int) -> Calendar:
     weekends = list(season_weekends(2026))[:6]
-    return Calendar(weekends=tuple(weekends), assignment={w.id: f"c{i}" for i, w in enumerate(weekends[:length])})
+    return Calendar(
+        weekends=tuple(weekends),
+        assignment={w.id: f"c{i}" for i, w in enumerate(weekends[:length])},
+    )
 
 
 def test_max_3_consecutive_ok_and_4_violates():
@@ -74,8 +102,13 @@ def test_max_3_consecutive_ok_and_4_violates():
 
 def test_one_race_per_weekend_and_uniqueness():
     weekends = list(season_weekends(2026))
-    dup = Calendar(weekends=tuple(weekends), assignment={weekends[0].id: "monza", weekends[1].id: "monza"})
-    assert any(code == "DUPLICATE_CIRCUIT" for _, code, _ in dup.structural_violations())
+    dup = Calendar(
+        weekends=tuple(weekends),
+        assignment={weekends[0].id: "monza", weekends[1].id: "monza"},
+    )
+    assert any(
+        code == "DUPLICATE_CIRCUIT" for _, code, _ in dup.structural_violations()
+    )
 
 
 def test_haversine_properties():
@@ -96,7 +129,11 @@ def test_baseline_determinism_and_infeasibility():
     assert b1.race_count() == 20
     assert b1.streak_violations() == []
     # Fully-blocked circuit forces BASELINE_INFEASIBLE (greedy), per contract
-    blocked = WeatherPolicy(version="t", feasibility={c: {w.id: False for w in weekends} for c in order}, default=True)
+    blocked = WeatherPolicy(
+        version="t",
+        feasibility={c: {w.id: False for w in weekends} for c in order},
+        default=True,
+    )
     with pytest.raises(BaselineInfeasible):
         build_baseline(order, weekends, blocked)
 
@@ -111,14 +148,31 @@ def test_venue_union_grade1_plus_f1_2020_onwards():
     coords = [(e["latitude"], e["longitude"]) for e in entries]
     assert len(set(coords)) == len(coords)  # one routing node per physical venue
     f1_only = [e for e in entries if e.get("venue_source") == "f1_calendar"]
-    assert {e["id"] for e in f1_only} == {"sochi", "istanbul", "suzuka", "shanghai", "austin", "mexico_city", "madring"}
+    assert {e["id"] for e in f1_only} == {
+        "sochi",
+        "istanbul",
+        "suzuka",
+        "shanghai",
+        "austin",
+        "mexico_city",
+        "madring",
+    }
     # Grade comes from the transmitted March list, except madring (verified
     # 2026-06-23 post-list homologation — see data notes).
     assert {e["id"] for e in f1_only if e.get("fia_license_grade") is None} == {
-        "sochi", "istanbul", "suzuka", "shanghai", "austin", "mexico_city",
+        "sochi",
+        "istanbul",
+        "suzuka",
+        "shanghai",
+        "austin",
+        "mexico_city",
     }
     for e in f1_only:
-        assert e["f1_hosted_seasons"] and min(e["f1_hosted_seasons"]) >= 2020 and max(e["f1_hosted_seasons"]) <= 2026
+        assert (
+            e["f1_hosted_seasons"]
+            and min(e["f1_hosted_seasons"]) >= 2020
+            and max(e["f1_hosted_seasons"]) <= 2026
+        )
     hosted_2026 = {e["id"] for e in entries if e.get("f1_current_2026")}
     assert {"suzuka", "shanghai", "austin", "mexico_city", "madring"} <= hosted_2026
     assert not ({"sochi", "istanbul"} & hosted_2026)

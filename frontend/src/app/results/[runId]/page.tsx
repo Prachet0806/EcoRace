@@ -2,8 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { use } from "react";
-import { useState } from "react";
+import { use, useState } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { useCircuits } from "@/features/circuits/useCircuits";

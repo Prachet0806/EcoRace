@@ -1,4 +1,5 @@
 """SQLite persistence layer for scenarios and optimization runs."""
+
 from __future__ import annotations
 
 import json
@@ -44,7 +45,9 @@ def init_db() -> None:
             conn.execute("ALTER TABLE runs ADD COLUMN provenance_json TEXT")
         orphan_count = len(conn.execute("PRAGMA foreign_key_check").fetchall())
         if orphan_count:
-            logging.getLogger("ecorace.persistence").warning("existing_foreign_key_violations=%s", orphan_count)
+            logging.getLogger("ecorace.persistence").warning(
+                "existing_foreign_key_violations=%s", orphan_count
+            )
         conn.commit()
 
 
@@ -59,7 +62,9 @@ def _scenario_from_row(row: sqlite3.Row) -> dict[str, Any]:
         "max_consecutive": row["max_consecutive"],
         "summer_break_start": row["summer_break_start"],
         "summer_break_end": row["summer_break_end"],
-        "pin_end_to_dec_week1": bool(row["pin_end_to_dec_week1"]) if row["pin_end_to_dec_week1"] is not None else None,
+        "pin_end_to_dec_week1": bool(row["pin_end_to_dec_week1"])
+        if row["pin_end_to_dec_week1"] is not None
+        else None,
         "config_complete": bool(row["config_complete"]),
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
@@ -79,7 +84,9 @@ def _run_from_row(row: sqlite3.Row) -> dict[str, Any]:
         "constraints": json.loads(row["constraints_json"]),
         "solver": json.loads(row["solver_json"]),
         "data_version": row["data_version"],
-        "provenance": json.loads(row["provenance_json"]) if row["provenance_json"] else None,
+        "provenance": json.loads(row["provenance_json"])
+        if row["provenance_json"]
+        else None,
         "created_at": row["created_at"],
         "completed_at": row["completed_at"],
     }
@@ -87,26 +94,26 @@ def _run_from_row(row: sqlite3.Row) -> dict[str, Any]:
 
 def _insert_scenario(conn: sqlite3.Connection, scn: dict[str, Any]) -> None:
     conn.execute(
-            """
+        """
             INSERT INTO scenarios (
                 id, race_count, circuit_ids, season_year, weekend_count, horizon_start, horizon_end,
                 max_consecutive, summer_break_start, summer_break_end, pin_end_to_dec_week1, config_complete, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, datetime('now'))
             """,
-            (
-                scn["scenario_id"],
-                scn["race_count"],
-                json.dumps(scn["circuit_ids"]),
-                scn["season_year"],
-                scn["weekend_count"],
-                scn["horizon"]["start"],
-                scn["horizon"]["end"],
-                scn["max_consecutive"],
-                scn["summer_break_start"],
-                scn["summer_break_end"],
-                int(scn["pin_end_to_dec_week1"]),
-            ),
-        )
+        (
+            scn["scenario_id"],
+            scn["race_count"],
+            json.dumps(scn["circuit_ids"]),
+            scn["season_year"],
+            scn["weekend_count"],
+            scn["horizon"]["start"],
+            scn["horizon"]["end"],
+            scn["max_consecutive"],
+            scn["summer_break_start"],
+            scn["summer_break_end"],
+            int(scn["pin_end_to_dec_week1"]),
+        ),
+    )
 
 
 def save_scenario(scn: dict[str, Any]) -> None:
@@ -124,7 +131,8 @@ def get_scenario(scn_id: str) -> dict[str, Any] | None:
 def list_scenarios(limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT * FROM scenarios ORDER BY created_at DESC LIMIT ? OFFSET ?", (limit, offset)
+            "SELECT * FROM scenarios ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (limit, offset),
         ).fetchall()
         return [_scenario_from_row(r) for r in rows]
 
@@ -138,28 +146,28 @@ def delete_scenario(scn_id: str) -> bool:
 
 def _insert_run(conn: sqlite3.Connection, run: dict[str, Any]) -> None:
     conn.execute(
-            """
+        """
             INSERT INTO runs (
                 id, scenario_id, status, season_year, race_count,
                 calendar_json, segments_json, metrics_json, constraints_json, solver_json,
                 data_version, provenance_json, completed_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
             """,
-            (
-                run["run_id"],
-                run.get("scenario_id"),
-                run["status"],
-                run["season_year"],
-                run["calendar"]["race_count"],
-                json.dumps(run["calendar"]),
-                json.dumps(run["segments"]),
-                json.dumps(run["metrics"]),
-                json.dumps(run["constraints"]),
-                json.dumps(run["solver"]),
-                run["data_version"],
-                json.dumps(run.get("provenance")),
-            ),
-        )
+        (
+            run["run_id"],
+            run.get("scenario_id"),
+            run["status"],
+            run["season_year"],
+            run["calendar"]["race_count"],
+            json.dumps(run["calendar"]),
+            json.dumps(run["segments"]),
+            json.dumps(run["metrics"]),
+            json.dumps(run["constraints"]),
+            json.dumps(run["solver"]),
+            run["data_version"],
+            json.dumps(run.get("provenance")),
+        ),
+    )
 
 
 def save_run(run: dict[str, Any]) -> None:

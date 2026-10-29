@@ -1,26 +1,38 @@
 """Migration, transaction, and foreign-key behavior for saved runs."""
+
 import sqlite3
 
 import pytest
-
 from ecorace.infrastructure import persistence
 
 
 def _scenario(scenario_id="scn_test"):
     return {
-        "scenario_id": scenario_id, "race_count": 20, "circuit_ids": [f"c{i}" for i in range(20)],
-        "season_year": 2026, "weekend_count": 40,
+        "scenario_id": scenario_id,
+        "race_count": 20,
+        "circuit_ids": [f"c{i}" for i in range(20)],
+        "season_year": 2026,
+        "weekend_count": 40,
         "horizon": {"start": "2026-03-06", "end": "2026-12-04"},
-        "max_consecutive": 2, "summer_break_start": 19, "summer_break_end": 21,
+        "max_consecutive": 2,
+        "summer_break_start": 19,
+        "summer_break_end": 21,
         "pin_end_to_dec_week1": True,
     }
 
 
 def _run(run_id="run_test", scenario_id="scn_test"):
     return {
-        "run_id": run_id, "scenario_id": scenario_id, "status": "feasible",
-        "season_year": 2026, "calendar": {"race_count": 20}, "segments": [],
-        "metrics": {}, "constraints": [], "solver": {}, "data_version": "test",
+        "run_id": run_id,
+        "scenario_id": scenario_id,
+        "status": "feasible",
+        "season_year": 2026,
+        "calendar": {"race_count": 20},
+        "segments": [],
+        "metrics": {},
+        "constraints": [],
+        "solver": {},
+        "data_version": "test",
         "provenance": {"weather_version": "weather-v1"},
     }
 
@@ -33,7 +45,9 @@ def test_complete_scenario_run_transaction_and_cascade(tmp_path, monkeypatch):
     assert stored["config_complete"] is True
     assert stored["max_consecutive"] == 2
     assert stored["pin_end_to_dec_week1"] is True
-    assert persistence.get_run("run_test")["provenance"]["weather_version"] == "weather-v1"
+    assert (
+        persistence.get_run("run_test")["provenance"]["weather_version"] == "weather-v1"
+    )
     with pytest.raises(sqlite3.IntegrityError):
         persistence.save_scenario_and_run(_scenario("scn_rolled_back"), _run())
     assert persistence.get_scenario("scn_rolled_back") is None
