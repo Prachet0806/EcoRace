@@ -2,16 +2,15 @@
 
 from __future__ import annotations
 
-import os
+import hashlib
+import uuid
 
 from ecorace.application import optimization_service as svc
 from ecorace.infrastructure import data_loader, persistence
 from ecorace.interface.http.errors import envelope
 from ecorace.interface.http.schemas import RunRequest
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 try:
     import psutil
@@ -20,20 +19,19 @@ except ImportError:
 
 router = APIRouter(prefix="/api/v1")
 
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=[os.environ.get("RATE_LIMIT_DEFAULT", "60/minute")],
-)
-
-
 @router.get("/health")
-@limiter.limit(os.environ.get("RATE_LIMIT_HEALTH", "120/minute"))
 def health(request: Request) -> dict:
+    if not persistence.database_health():
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "database": "unavailable"},
+        )
     _, tag = data_loader.circuits_bundle()
     breaker = request.app.state.circuit_breaker
     memory_mb = round(psutil.Process().memory_info().rss / 1e6, 1) if psutil else None
     return {
         "status": "ok",
+        "database": "ok",
         "dataset_version": tag,
         "weather_version": data_loader.weather_policy().version,
         "solver": {
@@ -45,7 +43,6 @@ def health(request: Request) -> dict:
 
 
 @router.get("/circuits")
-@limiter.limit(os.environ.get("RATE_LIMIT_CIRCUITS", "60/minute"))
 def circuits(request: Request) -> dict:
     circuits = data_loader.circuit_list_sorted()
     _, tag = data_loader.circuits_bundle()
@@ -53,10 +50,45 @@ def circuits(request: Request) -> dict:
 
 
 @router.post("/optimization/runs")
-@limiter.limit(os.environ.get("RATE_LIMIT_RUNS", "10/minute"))
-def create_run(body: RunRequest, request: Request) -> dict:
+def create_run(
+    body: RunRequest, request: Request,
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> dict:
+    request_hash = hashlib.sha256(body.model_dump_json().encode("utf-8")).hexdigest()
+    if idempotency_key is not None:
+        try:
+            parsed = uuid.UUID(idempotency_key)
+            if parsed.version != 4 or str(parsed) != idempotency_key:
+                raise ValueError("not a canonical UUID v4")
+        except ValueError:
+            return JSONResponse(
+                status_code=400,
+                content=envelope("INVALID_IDEMPOTENCY_KEY", "Idempotency-Key must be a UUID v4."),
+            )
+        state, run_id = persistence.claim_submission(idempotency_key, request_hash)
+        if state == "conflict":
+            return JSONResponse(
+                status_code=409,
+                content=envelope("IDEMPOTENCY_CONFLICT", "This key was used for a different request."),
+            )
+        if state == "running":
+            return JSONResponse(
+                status_code=409,
+                headers={"Retry-After": "2"},
+                content=envelope("REQUEST_IN_PROGRESS", "This optimization is still running."),
+            )
+        if state == "completed":
+            cached = persistence.get_run(run_id) if run_id else None
+            if cached is not None:
+                return cached
+            return JSONResponse(
+                status_code=503,
+                content=envelope("RESULT_UNAVAILABLE", "The completed result could not be read."),
+            )
     breaker = request.app.state.circuit_breaker
     if breaker.is_open():
+        if idempotency_key is not None:
+            persistence.fail_submission(idempotency_key, request_hash)
         return JSONResponse(
             status_code=503,
             headers={"Retry-After": "5"},
@@ -67,6 +99,8 @@ def create_run(body: RunRequest, request: Request) -> dict:
             ),
         )
     if not request.app.state.solver_slots.acquire(blocking=False):
+        if idempotency_key is not None:
+            persistence.fail_submission(idempotency_key, request_hash)
         return JSONResponse(
             status_code=503,
             headers={"Retry-After": "5"},
@@ -75,10 +109,9 @@ def create_run(body: RunRequest, request: Request) -> dict:
             ),
         )
     try:
-        budget = (
-            body.budget_s
-            if body.budget_s is not None
-            else float(request.app.state.solver_budget_s)
+        budget = min(
+            body.budget_s if body.budget_s is not None else float(request.app.state.solver_budget_s),
+            float(request.app.state.solver_budget_s),
         )
         scenario = svc.create_scenario(
             body.race_count,
@@ -110,15 +143,21 @@ def create_run(body: RunRequest, request: Request) -> dict:
         except Exception:
             breaker.record_failure()
             raise
-        persistence.save_scenario_and_run(scenario, result)
+        persistence.save_scenario_and_run(
+            scenario, result, submission_key=idempotency_key,
+            request_sha256=request_hash if idempotency_key is not None else None,
+        )
         breaker.record_success()
         return result
+    except Exception:
+        if idempotency_key is not None:
+            persistence.fail_submission(idempotency_key, request_hash)
+        raise
     finally:
         request.app.state.solver_slots.release()
 
 
 @router.get("/optimization/runs/{run_id}")
-@limiter.limit(os.environ.get("RATE_LIMIT_GET_RUN", "60/minute"))
 def get_run(run_id: str, request: Request) -> dict:
     result = persistence.get_run(run_id)
     if result is None:
@@ -129,8 +168,18 @@ def get_run(run_id: str, request: Request) -> dict:
     return result
 
 
+@router.get("/optimization/submissions/{key}")
+def get_submission(key: str, request: Request) -> dict:
+    status = persistence.get_submission(key)
+    if status is None:
+        return JSONResponse(
+            status_code=404,
+            content=envelope("SUBMISSION_NOT_FOUND", "Unknown submission key."),
+        )
+    return status
+
+
 @router.get("/seasons/{year}/weekends")
-@limiter.limit(os.environ.get("RATE_LIMIT_WEEKENDS", "60/minute"))
 def season_weekends(year: int, request: Request) -> dict:
     try:
         weekends = data_loader.season(year)

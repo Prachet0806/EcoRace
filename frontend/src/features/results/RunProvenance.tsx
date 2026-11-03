@@ -19,12 +19,15 @@ export function RunProvenance({ run, source }: { run: RunPayload; source: "sessi
     ["Seed", String(run.solver.seed)],
     ["Execution time", `${(run.solver.runtime_ms / 1000).toFixed(1)}s`],
     ["Solution source", run.solver.origin],
+    ["Travel tradeoff", run.provenance?.quality_selection
+      ? `${run.provenance.quality_selection.selected_extra_distance_pct}% beyond the shortest validated candidate to favor fewer region re-entries and long hops`
+      : "not recorded"],
     ["Optimality", run.solver.optimality_proven ? "proven optimal" : "best found (not proven)"],
     ["Loaded from", source === "session" ? "this browser" : "API"],
   ];
   return (
-    <section aria-label="Run information" className="rounded-lg border border-hairline bg-card p-3">
-      <h2 className="mb-2 font-display text-sm font-bold tracking-widest uppercase">Run information</h2>
+    <section aria-label="Run information" className="rounded-xl border border-hairline bg-card p-4">
+      <h2 className="mb-3 font-display text-[16px] font-medium">Run information</h2>
       <dl className="grid gap-x-6 gap-y-1 font-tel text-sm sm:grid-cols-2">
         {rows.map(([k, v]) => (
           <div key={k} className="flex justify-between gap-2 border-b border-hairline py-1">

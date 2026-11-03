@@ -15,24 +15,25 @@ export function SelectionStatus({ selectedCount, raceCount }: Props) {
   const pct = Math.min(100, Math.round((selectedCount / raceCount) * 100));
   const tone = err === null ? "ready" : selectedCount > raceCount ? "error" : "warn";
   return (
-    <section aria-label="Selection status" className="rounded-lg border border-hairline bg-card p-3">
+    <section aria-label="Selection status" className="rounded-xl border border-hairline bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-tel text-sm">
-          <span className="text-2xl font-semibold text-giallo">{selectedCount}</span>
-          <span className="text-mute"> / {raceCount} CIRCUITS</span>
+          <span className="text-2xl font-medium tabular-nums">{selectedCount}</span>
+          <span className="text-mute"> / {raceCount} circuits selected</span>
         </p>
-        <StatusBadge tone={tone}>{err === null ? "READY" : selectedCount > raceCount ? "OVER" : "BUILDING"}</StatusBadge>
+        <StatusBadge tone={tone}>{err === null ? "Ready" : selectedCount > raceCount ? "Over target" : "Building"}</StatusBadge>
       </div>
       <div
-        className="mt-2 h-1.5 overflow-hidden rounded bg-lift"
+        className="mt-3 h-1.5 overflow-hidden rounded bg-lift"
         role="progressbar"
-        aria-valuenow={selectedCount}
+        aria-valuenow={Math.min(selectedCount, raceCount)}
         aria-valuemin={0}
         aria-valuemax={raceCount}
+        aria-valuetext={`${selectedCount} of ${raceCount} circuits selected`}
         aria-label="Circuits selected"
       >
         <div
-          className={`h-full transition-[width] ${err === null ? "bg-pass" : selectedCount > raceCount ? "bg-rosso" : "bg-giallo"}`}
+          className="h-full bg-mute/60"
           style={{ width: `${pct}%` }}
         />
       </div>

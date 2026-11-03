@@ -12,17 +12,18 @@
   --ink-secondary: #a8a8b0;
   --line: #2a2a30;
   --rosso: #e10600;
-  --rosso-hover: #f6120c;
+  --rosso-hover: #c90500;
+  --rosso-ink: #ff625b;
   --giallo: #ffeb00;
   --pass: #22c55e;
-  --focus: var(--rosso);
+  --focus: var(--rosso-ink);
 }
 
 /* Future light theme (stub — implement toggle per ADR-FE-006):
 :root[data-theme="light"] {
   --surface-base: #fafafa; --surface-card: #ffffff; --surface-hover: #f1f1f2;
   --ink-primary: #141417; --ink-secondary: #52525b; --line: #e4e4e7;
-  --rosso: #c40500; --rosso-hover: #e10600; --giallo: #b59a00;
+  --rosso: #c40500; --rosso-hover: #a60400; --rosso-ink: #aa0500; --giallo: #b59a00;
   --pass: #15803d; --focus: var(--rosso);
 }
 */
@@ -36,6 +37,7 @@
   --color-hairline: var(--line);
   --color-rosso: var(--rosso);
   --color-rosso-hi: var(--rosso-hover);
+  --color-rosso-ink: var(--rosso-ink);
   --color-giallo: var(--giallo);
   --color-pass: var(--pass);
   /* Additive hierarchy aliases (V2): existing utilities above unchanged. */
@@ -45,7 +47,7 @@
   --color-content-inverse: var(--surface-base);
   --color-success: var(--pass);
   --color-warning: var(--giallo);
-  --color-error: var(--rosso);
+  --color-error: var(--rosso-ink);
   --color-info: var(--ink-secondary);
   --font-display: var(--font-display);
   --font-tel: var(--font-tel);
@@ -105,23 +107,20 @@ body {
   background: var(--surface-hover);
 }
 
-/* Strong variant: always-visible Rosso frame, display type, fills on hover. */
+/* Back navigation keeps the chamfer without competing with the primary action. */
 .chamfer-strong {
-  background: linear-gradient(to right, var(--rosso) 0 55%, var(--giallo) 55% 100%);
+  background: var(--line);
 }
 .chamfer-btn-strong {
-  padding: 8px 20px;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 13px;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
+  padding: 10px 16px;
+  font-weight: 500;
+  font-size: 14px;
   color: var(--ink-primary);
   background: var(--surface-card);
 }
 .chamfer-btn-strong:hover {
-  color: #fff;
-  background: var(--rosso);
+  color: var(--ink-primary);
+  background: var(--surface-hover);
 }
 
 @media (prefers-reduced-motion: reduce) {

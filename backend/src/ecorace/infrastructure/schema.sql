@@ -1,5 +1,5 @@
 -- EcoRace Planner SQLite Schema
--- Version 2: complete scenario configuration and run provenance.
+-- Version 4: complete configuration, provenance, durable API quotas, submissions.
 
 CREATE TABLE IF NOT EXISTS scenarios (
     id TEXT PRIMARY KEY,
@@ -38,3 +38,17 @@ CREATE TABLE IF NOT EXISTS runs (
 CREATE INDEX IF NOT EXISTS idx_runs_scenario ON runs(scenario_id);
 CREATE INDEX IF NOT EXISTS idx_runs_created ON runs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status);
+
+CREATE TABLE IF NOT EXISTS api_quotas (
+    bucket TEXT PRIMARY KEY,
+    window_start INTEGER NOT NULL,
+    count INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS submissions (
+    idempotency_key TEXT PRIMARY KEY,
+    request_sha256 TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('running', 'completed', 'failed', 'interrupted')),
+    run_id TEXT REFERENCES runs(id),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

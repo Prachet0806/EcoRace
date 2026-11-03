@@ -54,8 +54,11 @@ export const api = {
     summer_break_start?: number | null;
     summer_break_end?: number | null;
     pin_end_to_dec_week1?: boolean;
-  }) =>
-    request<RunPayload>("/api/v1/optimization/runs", { method: "POST", body: JSON.stringify(body) }).catch((e) => {
+  }, idempotencyKey?: string) =>
+    request<RunPayload>("/api/v1/optimization/runs", {
+      method: "POST", body: JSON.stringify(body),
+      headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined,
+    }).catch((e) => {
       if (e instanceof EcoRaceApiError) notifyError(e);
       throw e;
     }),
@@ -63,4 +66,7 @@ export const api = {
     if (e instanceof EcoRaceApiError) notifyError(e);
     throw e;
   }),
+  getSubmission: (key: string) => request<{ status: "running" | "completed" | "failed" | "interrupted"; run_id: string | null }>(
+    `/api/v1/optimization/submissions/${key}`,
+  ),
 };

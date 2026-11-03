@@ -64,6 +64,7 @@ class SolverMetadata:
     time_limit_s: float
     status: SolveStatus
     objective_km: float | None = None
+    shortest_candidate_km: float | None = None
     optimality_proven: bool = False
     data_version: str = "unknown"
 

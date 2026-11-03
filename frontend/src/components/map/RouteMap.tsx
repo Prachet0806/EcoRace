@@ -109,7 +109,7 @@ export function RouteMap({ run, hovered }: Props) {
     map.setFilter("race-hi", highlightRaceIds.length ? ["in", ["get", "race_id"], ["literal", highlightRaceIds]] : ["==", ["get", "race_id"], ""]);
   }, [highlightSegmentIds, highlightRaceIds]);
 
-  if (failed) return <p role="alert" className="rounded border border-rosso bg-card p-3 text-sm">Map unavailable: {failed}</p>;
+  if (failed) return <p role="alert" className="rounded-lg border border-rosso-ink/40 bg-card p-4 text-sm text-rosso-ink">Map unavailable: {failed}</p>;
 
-  return <div ref={containerRef} aria-label="Route map" className="h-[480px] w-full rounded-lg border border-hairline" />;
+  return <div ref={containerRef} aria-label="Route map" className="h-80 w-full rounded-xl border border-hairline md:h-[480px]" />;
 }

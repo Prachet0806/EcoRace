@@ -33,8 +33,8 @@ function detailFor(name: string, run: RunPayload): string {
 
 export function ConstraintDiagnostics({ run }: { run: RunPayload }) {
   return (
-    <section aria-label="Constraint diagnostics" className="rounded-lg border border-hairline bg-card p-3">
-      <h2 className="mb-2 font-display text-sm font-bold tracking-widest uppercase">Constraint check</h2>
+    <section aria-label="Constraint diagnostics" className="rounded-xl border border-hairline bg-card p-4">
+      <h2 className="mb-3 font-display text-[16px] font-medium">Constraint check</h2>
       <ul className="space-y-2 text-sm">
         {run.constraints.map((c) => (
           <li key={c.name}>
@@ -42,7 +42,7 @@ export function ConstraintDiagnostics({ run }: { run: RunPayload }) {
               <span
                 aria-label={c.satisfied ? "satisfied" : "violated"}
                 className={`rounded px-1.5 py-0.5 font-tel text-xs font-semibold ${
-                  c.satisfied ? "bg-pass/15 text-pass" : "bg-rosso/15 text-rosso"
+                  c.satisfied ? "bg-pass/15 text-pass" : "bg-rosso-ink/15 text-rosso-ink"
                 }`}
               >
                 {c.satisfied ? "PASS" : "FAIL"}

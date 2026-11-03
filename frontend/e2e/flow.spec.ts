@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
 
+test("frontend health endpoint responds", async ({ request }) => {
+  const response = await request.get("/api/health");
+  expect(response.ok()).toBe(true);
+  expect(await response.json()).toEqual({ status: "ok", service: "ecorace-frontend" });
+});
+
 // Full MVP loop against the real API (SOLVER_TIMEOUT_SECONDS=9 in e2e env).
 // Covers: gating, select → optimize → inspect (incl. map) → back with draft
 // preserved → modify → rerun, plus keyboard activation.
@@ -76,7 +82,7 @@ test("status rail and preview track the selection", async ({ page }) => {
   // Solve takes ~10-12s at the e2e budget; wait for results navigation.
   await expect(page).toHaveURL(/\/results\/run_/, { timeout: 120_000 });
   const firstRunId = page.url().split("/").pop()!;
-  await expect(page.getByRole("heading", { name: "Optimized calendar" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Optimized 2026 calendar/ })).toBeVisible();
   await expect(page.getByText("Total distance")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Calendar", exact: true })).toBeVisible();
   await expect(page.getByText(/Travel legs \(19\)/)).toBeVisible();
@@ -98,6 +104,8 @@ test("status rail and preview track the selection", async ({ page }) => {
   const secondRunId = page.url().split("/").pop()!;
   expect(secondRunId).not.toBe(firstRunId);
   await expect(page.getByRole("heading", { name: "Calendar", exact: true })).toBeVisible();
+  await page.getByLabel("Compare with a previous run from this browser").selectOption(firstRunId);
+  await expect(page.getByRole("region", { name: "Plan comparison" })).toContainText("Previous plan");
 });
 
 test("official venue set loads the 24-race preset without auto-running", async ({ page }) => {

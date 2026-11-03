@@ -1,6 +1,7 @@
 """P1 gate: solver correctness, determinism, timeout typing, validator independence."""
 
 import time
+import random
 from pathlib import Path
 
 from ecorace.domain.calendar.calendar import Calendar
@@ -22,6 +23,7 @@ from ecorace.optimization.model import (
     order_distance_km,
 )
 from ecorace.optimization.pipeline import build_problem, optimize
+from ecorace.optimization.quality import route_quality
 from ecorace.optimization.validator import SolutionValidator
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -199,3 +201,40 @@ def test_monthly_cover_preserves_tour_locality():
     assert order_distance_km(placed, CIRCUITS) <= tour_km * 1.05
     scen = Scenario(race_count=24, circuit_ids=tuple(order), season_year=2026)
     assert SolutionValidator.validate(cal, scen, WEEKENDS, WEATHER) == ()
+
+
+def test_operational_route_quality_regression():
+    official = [cid for cid in IDS if CIRCUITS[cid].f1_current_2026]
+    cases = [IDS[:24], official, random.Random(29).sample(IDS, 24)]
+    for ids in cases:
+        problem = build_problem(
+            Scenario(race_count=24, circuit_ids=tuple(ids), season_year=2026),
+            CIRCUITS, WEEKENDS, WEATHER, data_version="quality-test",
+        )
+        output, _ = HeuristicSolver().solve(problem, SolverConfig(time_limit_s=3, seed=0))
+        assert output is not None
+        calendar, _ = output
+        assert SolutionValidator.validate(calendar, problem.scenario, WEEKENDS, WEATHER) == ()
+        measures = route_quality(pipeline.race_order(calendar), CIRCUITS)
+        assert measures["region_backtracks"] == 0
+        assert measures["hops_over_5000_km"] <= 5
+        assert measures["longest_hop_km"] < 10000
+
+
+def test_regional_repair_removes_measured_reentry_with_bounded_distance():
+    ids = random.Random(1).sample(IDS, 24)
+    problem = build_problem(
+        Scenario(race_count=24, circuit_ids=tuple(ids), season_year=2026),
+        CIRCUITS, WEEKENDS, WEATHER, data_version="regional-regression",
+    )
+    output, _ = HeuristicSolver().solve(problem, SolverConfig(time_limit_s=3, seed=0))
+    assert output is not None
+    calendar, _ = output
+    assert SolutionValidator.validate(calendar, problem.scenario, WEEKENDS, WEATHER) == ()
+    measures = route_quality(pipeline.race_order(calendar), CIRCUITS)
+    assert measures["region_backtracks"] == 0
+    assert order_distance_km(pipeline.race_order(calendar), CIRCUITS) <= 43471.64 * 1.02
+    selected = optimize(problem, SolverConfig(time_limit_s=0, seed=0))
+    tradeoff = selected.diagnostics["quality_selection"]
+    assert tradeoff["region_backtracks"] == 0
+    assert 1.0 < tradeoff["selected_extra_distance_pct"] <= 2.0

@@ -36,13 +36,11 @@ from ecorace.interface.http.errors import (
     validation_handler,
 )
 from ecorace.interface.http.logging import request_id_middleware, setup_logging
-from ecorace.interface.http.routes import limiter, router
+from ecorace.interface.http.routes import router
 from ecorace.optimization.circuit_breaker import CircuitBreaker
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
 
 
 def _lan_origins() -> list[str]:
@@ -96,7 +94,8 @@ def create_app() -> FastAPI:
             else ""
         ),
         allow_methods=["GET", "POST"],
-        allow_headers=["content-type"],
+        allow_headers=["content-type", "idempotency-key", "x-request-id"],
+        expose_headers=["x-request-id", "retry-after"],
     )
 
     app.middleware("http")(request_id_middleware)
@@ -112,17 +111,20 @@ def create_app() -> FastAPI:
         max(1, int(os.environ.get("SOLVER_MAX_CONCURRENT", "1")))
     )
 
-    app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
     # Initialize database
     persistence.init_db()
+    persistence.interrupt_running_submissions()
 
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(RequestValidationError, validation_handler)
     app.add_exception_handler(Exception, internal_error_handler)
 
     app.include_router(router)
+
+    # Root-level health probe — no prefix so orchestrators/LB hit GET /health
+    from ecorace.interface.http import routes as _routes
+    app.add_api_route("/health", _routes.health, methods=["GET"], include_in_schema=False)
+
     return app
 
 

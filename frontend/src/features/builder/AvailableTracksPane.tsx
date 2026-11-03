@@ -28,7 +28,7 @@ export function AvailableTracksPane({ circuits, seasonYear, locked, onToggle }: 
   }, [circuits, region, query]);
 
   return (
-    <div className="rounded-lg border border-hairline bg-card p-3">
+    <div className="h-full rounded-xl border border-hairline bg-card p-4">
       <SectionLabel>Available circuits</SectionLabel>
       <p className="mb-2 font-tel text-xs text-mute">Available ({visible.length})</p>
       <label className="mb-2 block">
@@ -37,8 +37,8 @@ export function AvailableTracksPane({ circuits, seasonYear, locked, onToggle }: 
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search circuits…"
-          className="w-full rounded border border-hairline bg-base px-2 py-1 text-sm text-ink placeholder:text-mute"
+          placeholder="Search circuits"
+          className="h-10 w-full rounded-lg border border-hairline bg-base px-3 text-sm text-ink placeholder:text-mute"
         />
       </label>
       <div className="mb-2 flex flex-wrap gap-1" role="group" aria-label="Filter by region">
@@ -48,10 +48,10 @@ export function AvailableTracksPane({ circuits, seasonYear, locked, onToggle }: 
             type="button"
             onClick={() => setRegion(r)}
             aria-pressed={region === r}
-            className={`rounded border px-2 py-0.5 font-tel text-xs transition-colors ${
+            className={`min-h-8 rounded-md border px-2 font-tel text-xs transition-colors ${
               region === r
-                ? "border-rosso bg-rosso/15 text-ink"
-                : "border-hairline text-mute hover:border-rosso hover:text-ink"
+                ? "border-hairline bg-lift text-ink"
+                : "border-hairline text-mute hover:bg-lift hover:text-ink"
             }`}
           >
             {r}

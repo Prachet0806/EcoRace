@@ -60,7 +60,7 @@ jobs:
           set -euo pipefail
           docker volume create ecorace-ci-data
           trap 'docker rm -f ecorace-ci >/dev/null 2>&1 || true; docker volume rm ecorace-ci-data >/dev/null 2>&1 || true' EXIT
-          docker run -d --name ecorace-ci -p 18000:8000 -v ecorace-ci-data:/var/data ecorace-api:ci
+          docker run -d --name ecorace-ci -p 18000:8000 -v ecorace-ci-data:/var/data -e ECORACE_REQUIRE_PERSISTENT_DB=1 ecorace-api:ci
           for i in $(seq 1 60); do
             if curl -fsS http://localhost:18000/api/v1/health >/dev/null; then break; fi
             sleep 1
@@ -69,9 +69,22 @@ jobs:
           ids=$(curl -fsS http://localhost:18000/api/v1/circuits | jq -c '[.circuits[:20][] | .id]')
           test "$(echo "$ids" | jq 'length')" -eq 20
           payload=$(jq -n --argjson ids "$ids" '{race_count:20,circuit_ids:$ids,season_year:2026,budget_s:9}')
-          run_id=$(curl -fsS -H 'content-type: application/json' -d "$payload" http://localhost:18000/api/v1/optimization/runs | jq -er '.run_id')
+          key=$(python -c 'import uuid; print(uuid.uuid4())')
+          run_id=$(curl -fsS -H 'content-type: application/json' -H "Idempotency-Key: $key" -d "$payload" http://localhost:18000/api/v1/optimization/runs | jq -er '.run_id')
+          repeated=$(curl -fsS -H 'content-type: application/json' -H "Idempotency-Key: $key" -d "$payload" http://localhost:18000/api/v1/optimization/runs | jq -er '.run_id')
+          test "$run_id" = "$repeated"
+          curl -sS --max-time 60 -o /tmp/ecorace-load-a.json -w '%{http_code}' -H 'content-type: application/json' -d "$payload" http://localhost:18000/api/v1/optimization/runs > /tmp/ecorace-load-a.status &
+          first_pid=$!
+          curl -sS --max-time 60 -o /tmp/ecorace-load-b.json -w '%{http_code}' -H 'content-type: application/json' -d "$payload" http://localhost:18000/api/v1/optimization/runs > /tmp/ecorace-load-b.status &
+          second_pid=$!
+          wait "$first_pid"
+          wait "$second_pid"
+          test "$(sort /tmp/ecorace-load-{a,b}.status | tr '\n' ' ')" = '200 503 '
+          jq -s -e 'any(.[]; .error.code? == "SOLVER_OVERLOADED")' /tmp/ecorace-load-*.json
+          docker exec ecorace-ci python -m ecorace.infrastructure.db_admin backup /var/data/ecorace.db /var/data/recovery.db
+          docker exec ecorace-ci python -m ecorace.infrastructure.db_admin check /var/data/recovery.db --strict | jq -e '.runs >= 1'
           docker rm -f ecorace-ci
-          docker run -d --name ecorace-ci -p 18000:8000 -v ecorace-ci-data:/var/data ecorace-api:ci
+          docker run -d --name ecorace-ci -p 18000:8000 -v ecorace-ci-data:/var/data -e ECORACE_DB_PATH=/var/data/recovery.db -e ECORACE_REQUIRE_PERSISTENT_DB=1 ecorace-api:ci
           for i in $(seq 1 60); do
             if curl -fsS http://localhost:18000/api/v1/health >/dev/null; then break; fi
             sleep 1

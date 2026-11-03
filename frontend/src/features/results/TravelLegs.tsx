@@ -19,12 +19,22 @@ export function TravelLegs({ run, circuits, hovered, onHover }: Props) {
   const regionOf = new Map(circuits.map((c) => [c.id, displayRegion(c.region)]));
   const regionName = (circuitId: string | undefined) =>
     (circuitId && regionOf.get(circuitId)) ?? null;
+  const longest = run.metrics.longest_hop_km ?? Math.max(0, ...run.segments.map((s) => s.distance_km));
+  const longHops = run.metrics.hops_over_5000_km ?? run.segments.filter((s) => s.distance_km >= 5000).length;
+  const regionChanges = run.metrics.region_changes ?? run.segments.filter((s) => {
+    const from = regionName(s.from_circuit_id);
+    const to = regionName(s.to_circuit_id);
+    return from && to && from !== to;
+  }).length;
 
   return (
-    <section aria-label="Travel legs" className="rounded-lg border border-hairline bg-card p-3">
-      <h2 className="mb-2 font-display text-sm font-bold tracking-widest uppercase">
-        Travel legs <span className="font-tel text-giallo">({run.segments.length})</span>
+    <section aria-label="Travel legs" className="rounded-xl border border-hairline bg-card p-4">
+      <h2 className="mb-3 font-display text-[16px] font-medium">
+        Travel legs <span className="font-tel text-sm text-mute">({run.segments.length})</span>
       </h2>
+      <p className="mb-3 font-tel text-xs text-mute">
+        {regionChanges} region changes · {run.metrics.region_backtracks ?? 0} region re-entries · {longHops} legs over 5,000 km · longest {Math.round(longest).toLocaleString("en-US")} km
+      </p>
       <ol className="max-h-64 space-y-1 overflow-y-auto">
         {run.segments.map((s, i) => {
           const active = hovered?.kind === "segment" && hovered.id === s.segment_id;
@@ -40,21 +50,21 @@ export function TravelLegs({ run, circuits, hovered, onHover }: Props) {
                 onClick={() => set(active ? null : { kind: "segment", id: s.segment_id })}
                 onMouseEnter={() => set({ kind: "segment", id: s.segment_id })}
                 onMouseLeave={() => set(null)}
-                aria-label={`Leg ${i + 1}: ${a?.circuit_name} to ${b?.circuit_name}, ${s.distance_km} kilometers`}
-                className={`flex w-full items-baseline justify-between gap-2 rounded px-2 py-1 text-left text-sm transition-colors ${
-                  active ? "bg-rosso text-white" : "hover:bg-lift"
+                aria-label={`Leg ${i + 1}: ${a?.circuit_name} to ${b?.circuit_name}, ${Math.round(s.distance_km)} kilometers`}
+                className={`flex min-h-11 w-full items-baseline justify-between gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors ${
+                  active ? "bg-lift" : "hover:bg-lift"
                 }`}
               >
                 <span className="w-8 shrink-0 font-tel text-xs text-mute">{String(i + 1).padStart(2, "0")}</span>
                 <span className="flex-1">
                   {a?.circuit_name} → {b?.circuit_name}
                   {fromRegion && toRegion && (
-                    <span className={`block font-tel text-xs ${active ? "text-white/80" : "text-mute"}`}>
+                    <span className="block font-tel text-xs text-mute">
                       {fromRegion} → {toRegion}
                     </span>
                   )}
                 </span>
-                <span className="shrink-0 font-tel">{s.distance_km.toLocaleString("en-US")} km</span>
+                <span className="shrink-0 font-tel tabular-nums">{Math.round(s.distance_km).toLocaleString("en-US")} km</span>
               </button>
             </li>
           );

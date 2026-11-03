@@ -105,16 +105,16 @@ export function SelectionMap({ selected }: Props) {
   }, [selected]);
 
   if (failed) {
-    return <p role="alert" className="rounded border border-rosso bg-card p-3 text-sm">Preview unavailable: {failed}</p>;
+    return <p role="alert" className="rounded-lg border border-rosso-ink/40 bg-card p-4 text-sm text-rosso-ink">Preview unavailable: {failed}</p>;
   }
 
   return (
-    <section aria-label="Geographic preview" className="rounded-lg border border-hairline bg-card p-3">
+    <section aria-label="Geographic preview" className="rounded-xl border border-hairline bg-card p-4">
       <div className="mb-2 flex items-baseline justify-between">
         <SectionLabel>Geographic preview</SectionLabel>
         <p className="font-tel text-xs text-mute">{selected.length} plotted</p>
       </div>
-      <div ref={containerRef} role="img" aria-label={`World map showing ${selected.length} selected circuit locations`} className="h-64 w-full rounded border border-hairline" />
+      <div ref={containerRef} role="img" aria-label={`World map showing ${selected.length} selected circuit locations`} className="h-72 w-full rounded-lg border border-hairline" />
       <p className="mt-1 text-xs text-mute">Live footprint of your selection — the optimizer turns this into a route.</p>
     </section>
   );

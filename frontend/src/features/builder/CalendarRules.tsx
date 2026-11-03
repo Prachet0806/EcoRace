@@ -1,7 +1,6 @@
 "use client";
 
 import { SectionLabel } from "@/features/shared/SectionLabel";
-import { StatusBadge } from "@/features/shared/StatusBadge";
 import {
   MAX_RACES,
   MAX_STREAK_LIMIT,
@@ -63,14 +62,13 @@ export function CalendarRules({
       ? `${fmtWeekend(weekends[summerBreak.start], summerBreak.start)} → ${fmtWeekend(weekends[summerBreak.end], summerBreak.end)}`
       : null;
   return (
-    <section aria-label="Calendar rules" className="rounded-lg border border-hairline bg-card p-3">
-      <div className="mb-2 flex items-center justify-between">
+    <section aria-label="Calendar rules" className="rounded-xl border border-hairline bg-card p-4">
+      <div className="mb-3 flex items-center justify-between">
         <SectionLabel>Calendar rules</SectionLabel>
-        <StatusBadge tone="info">MVP</StatusBadge>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <p className="mb-2 font-tel text-xs tracking-widest text-mute uppercase">Your configuration</p>
+          <p className="mb-3 text-sm font-medium">Your configuration</p>
           <div className="flex flex-wrap items-center gap-4">
             <label className="flex items-center gap-2 text-sm">
               Races
@@ -80,11 +78,11 @@ export function CalendarRules({
                   onClick={() => onRaceCount(raceCount - 1)}
                   disabled={sourceLocked || raceCount <= MIN_RACES}
                   aria-label="Fewer races"
-                  className="rounded border border-hairline px-2 transition-colors hover:border-rosso disabled:opacity-40 disabled:hover:border-hairline"
+                  className="min-h-10 min-w-10 rounded-lg border border-hairline transition-colors hover:bg-lift disabled:opacity-40"
                 >
                   −
                 </button>
-                <output aria-live="polite" className="w-8 text-center font-tel font-semibold text-giallo">
+                <output aria-live="polite" className="w-8 text-center font-tel font-medium tabular-nums">
                   {raceCount}
                 </output>
                 <button
@@ -92,7 +90,7 @@ export function CalendarRules({
                   onClick={() => onRaceCount(raceCount + 1)}
                   disabled={sourceLocked || raceCount >= MAX_RACES}
                   aria-label="More races"
-                  className="rounded border border-hairline px-2 transition-colors hover:border-rosso disabled:opacity-40 disabled:hover:border-hairline"
+                  className="min-h-10 min-w-10 rounded-lg border border-hairline transition-colors hover:bg-lift disabled:opacity-40"
                 >
                   +
                 </button>
@@ -113,11 +111,11 @@ export function CalendarRules({
                   onClick={() => onMaxConsecutive(maxConsecutive - 1)}
                   disabled={maxConsecutive <= MIN_STREAK}
                   aria-label="Fewer consecutive races"
-                  className="rounded border border-hairline px-2 transition-colors hover:border-rosso disabled:opacity-40 disabled:hover:border-hairline"
+                  className="min-h-10 min-w-10 rounded-lg border border-hairline transition-colors hover:bg-lift disabled:opacity-40"
                 >
                   −
                 </button>
-                <output aria-live="polite" className="w-8 text-center font-tel font-semibold text-giallo">
+                <output aria-live="polite" className="w-8 text-center font-tel font-medium tabular-nums">
                   {maxConsecutive}
                 </output>
                 <button
@@ -125,7 +123,7 @@ export function CalendarRules({
                   onClick={() => onMaxConsecutive(maxConsecutive + 1)}
                   disabled={maxConsecutive >= MAX_STREAK_LIMIT}
                   aria-label="More consecutive races"
-                  className="rounded border border-hairline px-2 transition-colors hover:border-rosso disabled:opacity-40 disabled:hover:border-hairline"
+                  className="min-h-10 min-w-10 rounded-lg border border-hairline transition-colors hover:bg-lift disabled:opacity-40"
                 >
                   +
                 </button>
@@ -138,15 +136,15 @@ export function CalendarRules({
               <span className="text-mute" id="summer-break-label">
                 Summer break
               </span>
-              <div className="flex items-center gap-1" role="group" aria-labelledby="summer-break-label">
+              <div className="flex flex-wrap items-center gap-2" role="group" aria-labelledby="summer-break-label">
                 <button
                   type="button"
                   onClick={() => onSummerBreak(summerBreak ? null : { start: 19, end: 21 })}
-                  aria-pressed={summerBreak !== null}
-                  className={`rounded border px-2 py-0.5 font-tel text-xs transition-colors ${
-                    summerBreak !== null
-                      ? "border-rosso bg-rosso/15 text-ink"
-                      : "border-hairline text-mute hover:border-rosso hover:text-ink"
+                  aria-pressed={Boolean(summerBreak)}
+                  className={`min-h-10 rounded-lg border px-3 font-tel text-sm transition-colors ${
+                    summerBreak
+                      ? "border-hairline bg-lift text-ink"
+                      : "border-hairline text-mute hover:bg-lift hover:text-ink"
                   }`}
                 >
                   {summerBreak ? "On" : "Off"}
@@ -161,7 +159,7 @@ export function CalendarRules({
                           onSummerBreak({ ...summerBreak, start: Number(e.target.value) })
                         }
                         aria-label="Summer break start weekend"
-                        className="max-w-40 rounded border border-hairline bg-base px-1 py-0.5 font-tel text-xs text-ink"
+                        className="min-h-10 max-w-44 rounded-lg border border-hairline bg-base px-2 font-tel text-xs text-ink"
                       >
                         {weekends.map((w, i) => (
                           <option key={w.id} value={i}>
@@ -181,7 +179,7 @@ export function CalendarRules({
                           onSummerBreak({ ...summerBreak, end: Number(e.target.value) })
                         }
                         aria-label="Summer break end weekend"
-                        className="max-w-40 rounded border border-hairline bg-base px-1 py-0.5 font-tel text-xs text-ink"
+                        className="min-h-10 max-w-44 rounded-lg border border-hairline bg-base px-2 font-tel text-xs text-ink"
                       >
                         {weekends.map((w, i) => (
                           <option key={w.id} value={i}>
@@ -194,7 +192,7 @@ export function CalendarRules({
                 )}
               </div>
               {breakLabel && (
-                <p className="mt-1 font-tel text-xs text-giallo" aria-live="polite">
+                <p className="mt-1 font-tel text-xs text-mute" aria-live="polite">
                   {breakLabel}
                 </p>
               )}
@@ -204,14 +202,14 @@ export function CalendarRules({
                 type="checkbox"
                 checked={pinEnd}
                 onChange={(e) => onPinEnd(e.target.checked)}
-                className="h-4 w-4 accent-[#e10600]"
+                className="h-4 w-4 accent-rosso"
               />
               Pin finale to final planning weekend{weekends.length > 0 ? ` (${fmtDay(weekends[weekends.length - 1].friday)})` : ""}
             </label>
           </div>
         </div>
         <div>
-          <p className="mb-2 font-tel text-xs tracking-widest text-mute uppercase">Fixed model invariants</p>
+          <p className="mb-3 text-sm font-medium">Fixed model invariants</p>
           <ul className="space-y-1 text-sm">
             {INVARIANTS.map((rule) => (
               <li key={rule} className="flex items-center gap-2">

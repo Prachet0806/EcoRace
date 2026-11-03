@@ -4,7 +4,7 @@ import { Archivo, IBM_Plex_Mono } from "next/font/google";
 // tabular IBM Plex Mono for every telemetry numeral.
 export const display = Archivo({
   subsets: ["latin"],
-  weight: ["600", "700", "800"],
+  weight: ["400", "500", "600", "700"],
   style: ["normal", "italic"],
   variable: "--font-display",
 });

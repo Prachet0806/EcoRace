@@ -15,7 +15,7 @@ import { TrackWorkspace } from "@/features/builder/TrackWorkspace";
 import { useCircuits } from "@/features/circuits/useCircuits";
 import { RegionDistribution } from "@/features/geography/RegionDistribution";
 import { official2026VenueIds } from "@/features/geography/official";
-import type { Circuit } from "@/lib/types";
+import type { Circuit, RunPayload } from "@/lib/types";
 
 // Client-only: MapLibre needs window/WebGL.
 const SelectionMap = dynamic(() => import("@/features/geography/SelectionMap").then((m) => m.SelectionMap), {
@@ -23,6 +23,8 @@ const SelectionMap = dynamic(() => import("@/features/geography/SelectionMap").t
   loading: () => <p className="font-tel text-sm text-mute">Loading preview…</p>,
 });
 import { EcoRaceApiError, api } from "@/lib/api-client";
+import { rememberRun } from "@/lib/recent-runs";
+import { uuidv4 } from "@/lib/uuid";
 import { MAX_RACES, MIN_RACES, selectionError, useScenarioStore } from "@/lib/scenario-store";
 
 // Builder workstation v2.1: header → status → workspace → geography →
@@ -93,25 +95,50 @@ export default function EcoRacePage() {
   const runOptimization = useCallback(
     async (circuitIds: string[], count: number) => {
       setOptimizing();
+      const body = {
+        race_count: count,
+        circuit_ids: circuitIds,
+        season_year: seasonYear,
+        max_consecutive: maxConsecutive,
+        summer_break_start: summerBreak?.start ?? null,
+        summer_break_end: summerBreak?.end ?? null,
+        pin_end_to_dec_week1: pinEnd,
+      };
+      const serialized = JSON.stringify(body);
+      let key = uuidv4();
       try {
-        const result = await api.createRun({
-          race_count: count,
-          circuit_ids: circuitIds,
-          season_year: seasonYear,
-          max_consecutive: maxConsecutive,
-          summer_break_start: summerBreak?.start ?? null,
-          summer_break_end: summerBreak?.end ?? null,
-          pin_end_to_dec_week1: pinEnd,
-        });
+        const previous = JSON.parse(localStorage.getItem("ecorace:pending-run") ?? "null") as { body?: string; key?: string } | null;
+        if (previous?.body === serialized && previous.key) key = previous.key;
+        localStorage.setItem("ecorace:pending-run", JSON.stringify({ body: serialized, key }));
+      } catch {
+        // Private browsing can disable storage; this submission still works.
+      }
+      try {
+        let result: RunPayload;
+        try {
+          result = await api.createRun(body, key);
+        } catch (e) {
+          if (!(e instanceof EcoRaceApiError) || e.code !== "REQUEST_IN_PROGRESS") throw e;
+          const submission = await api.getSubmission(key);
+          if (submission.status !== "completed" || !submission.run_id) throw e;
+          result = await api.getRun(submission.run_id);
+        }
         try {
           sessionStorage.setItem(`ecorace:run:${result.run_id}`, JSON.stringify(result));
         } catch {
           // Storage full/blocked: results route falls back to API refetch.
         }
+        try { localStorage.removeItem("ecorace:pending-run"); } catch { /* Storage unavailable. */ }
+        rememberRun(result.run_id);
         setDone(result.run_id);
         router.push(`/results/${result.run_id}`);
       } catch (e: unknown) {
-        if (e instanceof EcoRaceApiError) setError(e.code, e.message);
+        if (e instanceof EcoRaceApiError) setError(
+          e.code,
+          e.code === "SCENARIO_INFEASIBLE"
+            ? `${e.message} Try a wider summer-break window, a higher consecutive-race limit, or unpin the finale.`
+            : e.message,
+        );
         else setError("REQUEST_FAILED", e instanceof Error ? e.message : "Optimization request failed.");
       }
     },
@@ -153,17 +180,17 @@ export default function EcoRacePage() {
 
   return (
     <AppShell>
-      <PageContainer wide>
+      <PageContainer>
         <ScenarioHeader
-          kicker="EcoRace · Calendar planner"
+          kicker="Calendar planner"
           title={
             <>
-              Build your <span className="text-rosso">calendar</span>
+              Choose circuits for {seasonYear}
             </>
           }
           meta={`${seasonYear} season · ${raceCount} races · 40 weekends · ${sourceLocked ? "official venue set" : "custom"}`}
           badge={
-            <span className="rounded border border-hairline px-2 py-1 font-tel text-xs tracking-widest text-mute uppercase">
+            <span className="rounded-md border border-hairline px-3 py-1 font-tel text-xs text-mute">
               Draft scenario
             </span>
           }
@@ -186,15 +213,15 @@ export default function EcoRacePage() {
           </div>
         )}
         {loadError && !loading && (
-          <div role="alert" className="rounded border border-rosso p-3 text-sm">
-            <p className="font-semibold">Circuit library unavailable</p>
+          <div role="alert" className="rounded-lg border border-rosso-ink/40 p-4 text-sm">
+            <p className="font-medium text-rosso-ink">Circuit library unavailable</p>
             <p className="text-mute">
               The planner could not connect to the optimization API: {loadError} Is the API running at {api.baseUrl}?
             </p>
             <button
               type="button"
               onClick={retry}
-              className="mt-2 rounded border border-hairline px-3 py-1 transition-colors hover:border-rosso"
+              className="mt-3 min-h-10 rounded-lg border border-hairline px-4 transition-colors hover:bg-lift"
             >
               Retry
             </button>
@@ -214,7 +241,7 @@ export default function EcoRacePage() {
           </>
         )}
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(280px,1fr)]">
           <SelectionMap selected={selected} />
           <RegionDistribution selected={selected} />
         </div>
@@ -234,7 +261,7 @@ export default function EcoRacePage() {
         />
 
         {status === "error" && (
-          <p role="alert" className="rounded border border-rosso p-2 font-tel text-sm">
+          <p role="alert" className="rounded-lg border border-rosso-ink/40 p-3 font-tel text-sm text-rosso-ink">
             {errorCode}: {errorMessage}
           </p>
         )}

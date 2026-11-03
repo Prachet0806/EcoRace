@@ -1,6 +1,5 @@
 "use client";
 
-import { Pinstripe } from "@/components/ui/Pinstripe";
 import { TopBar } from "@/components/layout/TopBar";
 import { Toaster } from "@/components/ui/Toaster";
 
@@ -13,14 +12,13 @@ interface Props {
 // Shared application shell: top bar + content + product footer.
 export function AppShell({ runId, onBack, children }: Props) {
   return (
-    <div className="min-h-screen bg-base text-ink">
-      <div className="mx-auto max-w-6xl px-4 pt-4">
+    <div className="flex min-h-screen flex-col bg-base text-ink">
+      <div className="mx-auto w-full max-w-[1440px] px-4 pt-4 sm:px-6 lg:px-8">
         <TopBar runId={runId} onBack={onBack} />
       </div>
       {children}
-      <div className="mx-auto max-w-6xl px-4 pb-4">
-        <footer className="text-xs text-mute">
-          <Pinstripe className="mb-2 opacity-60" />
+      <div className="mx-auto mt-auto w-full max-w-[1440px] px-4 pb-6 sm:px-6 lg:px-8">
+        <footer className="border-t border-hairline pt-4 text-xs leading-5 text-mute">
           Decision-support experiment, not an official F1 calendar. Distances are great-circle approximations; weather
           reflects the configured feasibility policy, not a forecast.
         </footer>

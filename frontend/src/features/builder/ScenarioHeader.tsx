@@ -1,7 +1,5 @@
 "use client";
 
-import { Pinstripe } from "@/components/ui/Pinstripe";
-
 interface Props {
   kicker: string;
   title: React.ReactNode;
@@ -13,16 +11,15 @@ interface Props {
 // (OPTIMIZATION RESULT) via the variant props. One coherent product bar.
 export function ScenarioHeader({ kicker, title, meta, badge }: Props) {
   return (
-    <header>
+    <header className="border-b border-hairline pb-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="font-tel text-xs font-semibold tracking-widest text-giallo uppercase">{kicker}</p>
-          <h1 className="font-display text-3xl font-extrabold tracking-tight italic">{title}</h1>
-          <p className="font-tel text-sm text-ink">{meta}</p>
+          <p className="mb-2 text-sm text-mute">{kicker}</p>
+          <h1 className="font-display text-3xl font-medium leading-tight md:text-4xl">{title}</h1>
+          <p className="mt-2 font-tel text-sm text-mute">{meta}</p>
         </div>
         {badge}
       </div>
-      <Pinstripe className="mt-3" />
     </header>
   );
 }

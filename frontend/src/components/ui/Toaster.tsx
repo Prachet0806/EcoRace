@@ -17,14 +17,14 @@ export function Toaster() {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg min-w-[280px] max-w-[400px] animate-slide-in ${
+          className={`pointer-events-auto flex min-w-[280px] max-w-[400px] items-center gap-3 rounded-lg border bg-card px-4 py-3 ${
             toast.type === "error"
-              ? "bg-rosso/10 border-rosso text-rosso"
+              ? "border-rosso-ink/40 text-rosso-ink"
               : toast.type === "success"
-              ? "bg-green-600/10 border-green-600 text-green-600"
+              ? "border-hairline text-pass"
               : toast.type === "warning"
-              ? "bg-amber-600/10 border-amber-600 text-amber-600"
-              : "bg-blue-600/10 border-blue-600 text-blue-600"
+              ? "border-hairline text-giallo"
+              : "border-hairline text-ink"
           }`}
           role="alert"
         >

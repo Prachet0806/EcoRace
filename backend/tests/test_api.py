@@ -1,5 +1,7 @@
 """P2 gate: HTTP integration, stable error codes, response contracts, CORS."""
 
+import uuid
+
 from ecorace.application import optimization_service as svc
 from ecorace.infrastructure import data_loader, persistence
 from ecorace.interface.http.app import create_app
@@ -233,3 +235,50 @@ def test_public_history_and_delete_routes_are_absent():
     assert client.get("/api/v1/scenarios").status_code == 404
     assert client.get("/api/v1/optimization/runs").status_code == 405
     assert client.delete("/api/v1/scenarios/scn_unknown").status_code == 404
+
+
+def test_request_id_and_payload_limit():
+    r = client.get("/api/v1/health", headers={"X-Request-ID": "test-request-1"})
+    assert r.headers["x-request-id"] == "test-request-1"
+    r = client.get("/api/v1/health", headers={"X-Request-ID": "x" * 200})
+    assert len(r.headers["x-request-id"]) <= 64
+    r = client.post(
+        "/api/v1/optimization/runs",
+        content=b" " * 17000,
+        headers={"Content-Type": "application/json"},
+    )
+    assert r.status_code == 413
+    assert r.json()["error"]["code"] == "PAYLOAD_TOO_LARGE"
+
+
+def test_idempotency_key_reuses_result_after_restart_state_recovery():
+    key = str(uuid.uuid4())
+    payload = {"race_count": 20, "circuit_ids": IDS[:20], "budget_s": 3.0}
+    headers = {"Idempotency-Key": key}
+    first = client.post("/api/v1/optimization/runs", json=payload, headers=headers)
+    assert first.status_code == 200, first.text
+    again = client.post("/api/v1/optimization/runs", json=payload, headers=headers)
+    assert again.status_code == 200
+    assert again.json()["run_id"] == first.json()["run_id"]
+    status = client.get(f"/api/v1/optimization/submissions/{key}")
+    assert status.json() == {"status": "completed", "run_id": first.json()["run_id"]}
+    changed = client.post(
+        "/api/v1/optimization/runs",
+        json={**payload, "budget_s": 4.0}, headers=headers,
+    )
+    assert changed.status_code == 409
+    assert changed.json()["error"]["code"] == "IDEMPOTENCY_CONFLICT"
+
+
+def test_api_quota_survives_new_app_instance(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT_HEALTH", "1/minute")
+    first_app = create_app()
+    client_address = (f"quota-{uuid.uuid4()}", 51000)
+    isolated = TestClient(first_app, client=client_address)
+    assert isolated.get("/api/v1/health").status_code == 200
+    second_app = create_app()
+    after_restart = TestClient(second_app, client=client_address)
+    limited = after_restart.get("/api/v1/health")
+    assert limited.status_code == 429
+    assert limited.json()["error"]["code"] == "RATE_LIMITED"
+    assert int(limited.headers["Retry-After"]) >= 1

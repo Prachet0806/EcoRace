@@ -27,6 +27,7 @@ from ecorace.infrastructure import data_loader, persistence
 from ecorace.optimization.model import OptimizationResult, SolverConfig, SolveStatus
 from ecorace.optimization.pipeline import InfeasibleProblem, build_problem, optimize
 from ecorace.optimization.validator import SolutionValidator
+from ecorace.optimization.quality import route_quality
 
 _DOMAIN_ERRORS = (
     InsufficientCircuits,
@@ -266,6 +267,7 @@ def present_result(
         "segments": segments,
         "metrics": {
             "total_distance_km": round(result.total_distance_km, 2),
+            **route_quality([race["circuit_id"] for race in races], circuits),
             "baseline_distance_km": round(result.baseline_distance_km, 2)
             if result.baseline_distance_km
             else None,
@@ -372,6 +374,7 @@ def present_result(
             "requested_budget_s": total_budget_s,
             "seed_schedule": list(seeds),
             "attempts": result.diagnostics.get("attempts", []),
+            "quality_selection": result.diagnostics.get("quality_selection"),
             "total_runtime_ms": total_runtime_ms,
         },
     }

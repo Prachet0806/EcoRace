@@ -22,6 +22,7 @@ from ecorace.optimization.model import (
     build_distance_matrix,
     order_distance_km,
 )
+from ecorace.optimization.quality import route_quality
 from ecorace.optimization.validator import SolutionValidator
 
 
@@ -57,6 +58,50 @@ def two_opt(path: list[int], matrix: list[list[float]]) -> list[int]:
                     best = cand
                     improved = True
     return best
+
+
+def regional_cluster_order(
+    order_ids: list[str], circuits: dict, matrix: list[list[float]], start: int,
+) -> list[int]:
+    """Visit each region once, choosing its nearest entry from the last stop."""
+    groups: dict[str, set[int]] = {}
+    for index, cid in enumerate(order_ids):
+        groups.setdefault(circuits[cid].region, set()).add(index)
+    current_region = circuits[order_ids[start]].region
+    path = [start]
+    groups[current_region].remove(start)
+    while any(groups.values()):
+        if not groups[current_region]:
+            current_region = min(
+                (region for region, members in groups.items() if members),
+                key=lambda region: min((matrix[path[-1]][j], j) for j in groups[region]),
+            )
+        nxt = min(groups[current_region], key=lambda j: (matrix[path[-1]][j], j))
+        path.append(nxt)
+        groups[current_region].remove(nxt)
+    return path
+
+
+def region_repair_orders(path: list[int], order_ids: list[str], circuits: dict) -> list[list[int]]:
+    """Move one repeated region block next to its previous visit."""
+    regions = [circuits[order_ids[index]].region for index in path]
+    blocks: list[tuple[str, int, int]] = []
+    start = 0
+    for end in range(1, len(path) + 1):
+        if end == len(path) or regions[end] != regions[start]:
+            blocks.append((regions[start], start, end))
+            start = end
+    repaired = []
+    for earlier, (region, _, insertion) in enumerate(blocks):
+        for later_region, later_start, later_end in blocks[earlier + 2 :]:
+            if later_region != region:
+                continue
+            moved = path[later_start:later_end]
+            remaining = path[:later_start] + path[later_end:]
+            repaired.append(remaining[:insertion] + moved + remaining[insertion:])
+            if len(moved) > 1:
+                repaired.append(remaining[:insertion] + moved[::-1] + remaining[insertion:])
+    return repaired
 
 
 def place_with_monthly_cover(
@@ -174,9 +219,7 @@ class HeuristicSolver:
         weekends = list(problem.weekends)
         matrix = build_distance_matrix(problem.circuits, ids)
 
-        best_cal: Calendar | None = None
-        best_km = float("inf")
-        best_order: list[str] | None = None
+        candidates: list[tuple[float, dict, Calendar, list[str]]] = []
         scen = problem.scenario
         break_ids = summer_break_weekend_ids(scen, problem.weekends)
         last_id = problem.weekends[-1].id if scen.pin_end_to_dec_week1 else None
@@ -186,61 +229,76 @@ class HeuristicSolver:
                 and time.monotonic() >= config.deadline_monotonic
             ):
                 break
-            order_idx = two_opt(nearest_neighbor(ids, matrix, start), matrix)
-            order = [ids[i] for i in order_idx]
-            cals: list[Calendar] = []
-            for attempt in (
-                lambda: build_baseline(
-                    order,
-                    weekends,
-                    problem.weather,
-                    max_consecutive=scen.max_consecutive,
-                    forbidden_ids=break_ids,
-                    last_weekend_id=last_id,
-                ),
-                lambda: place_with_monthly_cover(
-                    order,
-                    weekends,
-                    problem.weather,
-                    scen.max_consecutive,
-                    break_ids,
-                    last_id,
-                ),
-            ):
-                try:
-                    cals.append(attempt())
-                except BaselineInfeasible:
-                    continue
-            for cal in cals:
-                if SolutionValidator.validate(
-                    cal, scen, problem.weekends, problem.weather
+            shortest_order = two_opt(nearest_neighbor(ids, matrix, start), matrix)
+            orders = [shortest_order]
+            orders.extend(region_repair_orders(shortest_order, ids, problem.circuits))
+            clustered = regional_cluster_order(ids, problem.circuits, matrix, start)
+            if clustered != orders[0]:
+                orders.append(clustered)
+            for order_idx in orders:
+                if config.deadline_monotonic is not None and time.monotonic() >= config.deadline_monotonic:
+                    break
+                order = [ids[i] for i in order_idx]
+                cals: list[Calendar] = []
+                for attempt in (
+                    lambda: build_baseline(
+                        order,
+                        weekends,
+                        problem.weather,
+                        max_consecutive=scen.max_consecutive,
+                        forbidden_ids=break_ids,
+                        last_weekend_id=last_id,
+                    ),
+                    lambda: place_with_monthly_cover(
+                        order,
+                        weekends,
+                        problem.weather,
+                        scen.max_consecutive,
+                        break_ids,
+                        last_id,
+                    ),
                 ):
-                    continue  # never prefer a dirty calendar, even a short one
-                km = order_distance_km(
-                    [cal.assignment[w.id] for w in weekends if w.id in cal.assignment],
-                    problem.circuits,
-                )
-                if km < best_km:
-                    best_km, best_cal, best_order = km, cal, order
+                    try:
+                        cals.append(attempt())
+                    except BaselineInfeasible:
+                        continue
+                for cal in cals:
+                    if SolutionValidator.validate(cal, scen, problem.weekends, problem.weather):
+                        continue
+                    placed = [cal.assignment[w.id] for w in weekends if w.id in cal.assignment]
+                    km = order_distance_km(placed, problem.circuits)
+                    candidates.append((km, route_quality(placed, problem.circuits), cal, order))
 
         runtime_ms = int((time.perf_counter() - t0) * 1000)
-        if best_cal is None:
+        if not candidates:
             return None, SolverMetadata(
                 solver_name=self.name,
-                solver_version="nn-2opt-v1",
+                solver_version="nn-2opt-regional-v2",
                 seed=config.seed,
                 runtime_ms=runtime_ms,
                 time_limit_s=config.time_limit_s,
                 status=SolveStatus.INFEASIBLE,
                 data_version=problem.data_version,
             )
+        shortest = min(candidate[0] for candidate in candidates)
+        eligible = [candidate for candidate in candidates if candidate[0] <= shortest * 1.02]
+        best_km, _, best_cal, best_order = min(
+            eligible,
+            key=lambda candidate: (
+                candidate[1]["region_backtracks"],
+                candidate[1]["hops_over_5000_km"],
+                candidate[1]["longest_hop_km"],
+                candidate[0],
+            ),
+        )
         return (best_cal, best_order), SolverMetadata(
             solver_name=self.name,
-            solver_version="nn-2opt-v1",
+            solver_version="nn-2opt-regional-v2",
             seed=config.seed,
             runtime_ms=runtime_ms,
             time_limit_s=config.time_limit_s,
             status=SolveStatus.FEASIBLE,
             objective_km=best_km,
+            shortest_candidate_km=shortest,
             data_version=problem.data_version,
         )

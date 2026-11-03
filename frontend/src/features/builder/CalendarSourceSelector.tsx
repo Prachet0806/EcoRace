@@ -15,29 +15,32 @@ export function CalendarSourceSelector({ source, officialCount, onChange }: Prop
     {
       id: "official-2026-venues",
       title: "Official season",
-      body: `Load the official 2026 venue set (${officialCount} circuits) into your calendar, then optimize when ready. Dates and order are optimizer outputs.`,
+      body: `Use the ${officialCount} official 2026 venues. The optimizer assigns dates and order.`,
     },
     {
       id: "custom",
       title: "Custom calendar",
-      body: "Build a 20–24 race calendar from the full circuit library.",
+      body: "Choose 20–24 circuits from the full library.",
     },
   ];
   return (
-    <section aria-label="Calendar source" className="rounded-lg border border-hairline bg-card p-3">
-      <div className="grid gap-2 md:grid-cols-2" role="group" aria-label="Calendar source">
+    <section aria-label="Calendar source" className="rounded-xl border border-hairline bg-card p-4">
+      <div className="grid gap-3 md:grid-cols-2" role="group" aria-label="Calendar source">
         {cards.map((c) => (
           <button
             key={c.id}
             type="button"
             onClick={() => onChange(c.id)}
             aria-pressed={source === c.id}
-            className={`rounded border p-3 text-left transition-colors ${
-              source === c.id ? "border-rosso bg-rosso/10" : "border-hairline hover:border-rosso"
+            className={`min-h-24 rounded-lg border p-4 text-left transition-colors ${
+              source === c.id ? "border-hairline bg-lift" : "border-hairline hover:bg-lift"
             }`}
           >
-            <span className="font-display text-sm font-bold tracking-widest uppercase">{c.title}</span>
-            <span className="mt-1 block text-sm text-mute">{c.body}</span>
+            <span className="flex items-center gap-2 font-display text-[16px] font-medium">
+              <span aria-hidden="true" className={`h-2 w-2 rounded-full ${source === c.id ? "bg-rosso" : "bg-mute/40"}`} />
+              {c.title}
+            </span>
+            <span className="mt-2 block text-sm leading-5 text-mute">{c.body}</span>
           </button>
         ))}
       </div>

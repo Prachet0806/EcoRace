@@ -5,7 +5,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app/backend/src \
     SOLVER_TIMEOUT_SECONDS=30 \
     LOG_LEVEL=INFO \
-    ECORACE_DB_PATH=/var/data/ecorace.db
+    ECORACE_DB_PATH=/var/data/ecorace.db \
+    ECORACE_DB_MOUNT=/var/data
 
 WORKDIR /app
 COPY pyproject.toml ./

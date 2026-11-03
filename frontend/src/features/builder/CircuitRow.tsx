@@ -21,14 +21,14 @@ export function CircuitRow({ circuit: c, seq, seasonYear, disabled = false, onTo
       onClick={() => onToggle(c.id)}
       disabled={disabled}
       aria-label={`${selected ? "Deselect" : "Select"} ${c.name}`}
-      className={`flex w-full items-center gap-2 rounded border px-2 py-1.5 text-left transition-colors disabled:cursor-not-allowed ${
+      className={`flex min-h-12 w-full items-center gap-2 rounded-lg border px-2 py-2 text-left transition-colors disabled:cursor-not-allowed ${
         selected
-          ? "border-l-2 border-l-giallo border-y-hairline border-r-hairline bg-lift"
+          ? "border-l-2 border-l-mute/50 border-y-hairline border-r-hairline bg-lift"
           : "border border-transparent hover:border-hairline hover:bg-lift disabled:hover:border-transparent disabled:hover:bg-transparent"
       }`}
     >
       {selected && (
-        <span className="w-7 shrink-0 rounded bg-giallo px-1 py-0.5 text-center font-tel text-xs font-semibold text-black">
+        <span className="w-7 shrink-0 rounded bg-lift px-1 py-0.5 text-center font-tel text-xs text-ink">
           {String(seq).padStart(2, "0")}
         </span>
       )}
@@ -41,7 +41,7 @@ export function CircuitRow({ circuit: c, seq, seasonYear, disabled = false, onTo
           {c.city} · {c.country} · {venueLabel(c, seasonYear)}
         </span>
       </span>
-      <span aria-hidden="true" className={`shrink-0 font-tel text-sm ${selected ? "text-rosso-hi" : "text-mute"}`}>
+      <span aria-hidden="true" className="shrink-0 font-tel text-sm text-mute">
         {selected ? "×" : "+"}
       </span>
     </button>

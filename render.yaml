@@ -1,17 +1,22 @@
 # EcoRace Planner — Render Blueprint (backend only; frontend deploys on Vercel).
 # Apply via "New +" → "Blueprint" in the Render dashboard, or `render blueprint launch`.
-# No persistent disk: SQLite at /var/data/ecorace.db is ephemeral by design (MVP).
-# If you later need run persistence, add a disk mounted at /var/data
-# (NOT /app/data — that would shadow the baked-in reference data).
+# Single-instance SQLite: the database and its WAL live on a persistent disk.
+# Do not mount over /app/data; that directory contains baked-in reference data.
 
 services:
   - type: web
     name: ecorace-api
     runtime: docker
-    plan: free
+    # Persistent disks are unavailable on Render's free web plan. The solver
+    # also needs more than 512 MB for larger calendars.
+    plan: 1c-2g
     dockerfilePath: backend/Dockerfile
     dockerContext: .
     healthCheckPath: /api/v1/health
+    disk:
+      name: ecorace-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       # Set in the Render dashboard after the Vercel app exists
       # (NEXT_PUBLIC_ECORACE_API_URL on Vercel must point back here).
@@ -28,3 +33,7 @@ services:
       # Baked into the Dockerfile already; listed here to pin the contract.
       - key: ECORACE_DB_PATH
         value: /var/data/ecorace.db
+      - key: ECORACE_REQUIRE_PERSISTENT_DB
+        value: "1"
+      - key: ECORACE_DB_MOUNT
+        value: /var/data
