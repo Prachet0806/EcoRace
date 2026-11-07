@@ -231,34 +231,23 @@ export function CalendarRules({
 
           {/* Pin season finale subsection */}
           <div className="rounded-lg border border-hairline/80 bg-base/50 p-4">
-            <div className="flex items-center justify-between">
+            <label className="flex cursor-pointer items-start justify-between gap-3">
               <div>
                 <h4 className="font-display text-sm font-medium text-ink">Pin season finale</h4>
-                <p className="text-xs text-mute">Require the final championship round on the last weekend.</p>
+                <p className="text-xs text-mute mt-0.5">Require the final championship round on the last planning weekend.</p>
               </div>
-              <label className="relative inline-flex cursor-pointer items-center">
-                <input
-                  type="checkbox"
-                  checked={pinEnd}
-                  onChange={(e) => onPinEnd(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-lift peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-pass"></div>
-              </label>
-            </div>
-            <p className="mt-3 text-xs leading-relaxed text-mute">
-              Enforces scheduling the season finale strictly on the final planning weekend
-              {weekends.length > 0 ? ` (${fmtDay(weekends[weekends.length - 1].friday)})` : ""}, mirroring traditional calendar closers.
-            </p>
-            <label className="sr-only">
               <input
                 type="checkbox"
                 checked={pinEnd}
                 onChange={(e) => onPinEnd(e.target.checked)}
-                aria-label="Pin finale to final planning weekend"
+                aria-label={`Pin finale to final planning weekend${weekends.length > 0 ? ` (${fmtDay(weekends[weekends.length - 1].friday)})` : ""}`}
+                className="mt-1 h-5 w-5 shrink-0 cursor-pointer rounded border border-hairline accent-rosso focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rosso"
               />
-              Pin finale to final planning weekend
             </label>
+            <p className="mt-3 text-xs leading-relaxed text-mute">
+              Enforces scheduling the season finale strictly on the final planning weekend
+              {weekends.length > 0 ? ` (${fmtDay(weekends[weekends.length - 1].friday)})` : ""}, mirroring traditional calendar closers.
+            </p>
           </div>
         </div>
       </div>
