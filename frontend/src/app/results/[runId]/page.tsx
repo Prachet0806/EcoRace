@@ -56,16 +56,19 @@ export default function ResultsPage({ params }: { params: Promise<{ runId: strin
     );
   }
 
-  if (load.state === "missing" || load.state === "invalid") {
+  if (load.state === "missing" || load.state === "invalid" || load.state === "storage_unavailable") {
     const isInvalid = load.state === "invalid";
+    const isStorageBlocked = load.state === "storage_unavailable";
     return (
       <AppShell onBack={back}>
         <PageContainer>
           <div className="flex min-h-[55vh] max-w-xl flex-col justify-center">
             <h1 className="font-display text-3xl font-medium">Result not available</h1>
             <p className="mt-3 text-sm leading-6 text-mute">
-              {isInvalid
-                ? "The stored result for this run is corrupted and cannot be displayed."
+              {isStorageBlocked
+                ? "Browser storage is disabled or unavailable, and this result is no longer held in memory."
+                : isInvalid
+                ? `The stored result for this run is corrupted (${load.reason ?? "schema mismatch"}) and cannot be displayed.`
                 : <>
                     Run <span className="font-tel">{runId}</span> is not available in this browser session.
                     Results are kept in session storage only and are cleared when the tab is closed.

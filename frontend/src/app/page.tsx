@@ -110,7 +110,7 @@ export default function EcoRacePage() {
         } catch {
           // Storage full/blocked: the optimization result is still valid in React state.
         }
-        setDone(result.run_id);
+        setDone(result.run_id, result);
         router.push(`/results/${result.run_id}`);
       } catch (e: unknown) {
         if (e instanceof EcoRaceApiError) setError(

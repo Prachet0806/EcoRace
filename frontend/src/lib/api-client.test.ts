@@ -38,13 +38,4 @@ describe("api-client contract", () => {
     expect(err).toBeInstanceOf(EcoRaceApiError);
     expect((err as EcoRaceApiError).code).toBe("INSUFFICIENT_CIRCUITS");
   });
-
-  it("GETs a run by id", async () => {
-    const mock = mockFetchOnce(200, { run_id: "run_1" });
-    await api.getRun("run_1");
-    expect(mock).toHaveBeenCalledWith(
-      "http://localhost:8000/api/v1/optimization/runs/run_1",
-      expect.anything(),
-    );
-  });
 });

@@ -25,6 +25,9 @@ _QUOTA = re.compile(r"^([1-9][0-9]*)/(second|minute|hour)$")
 _QUOTA_WINDOWS: dict[str, list[float]] = {}
 _QUOTA_LOCK = threading.Lock()
 _MAX_ENTRIES_PER_KEY = 1000  # bound memory per client+group
+_MAX_TRACKED_KEYS = 5000     # maximum number of client:group keys to track
+_LAST_PRUNE_TIME: float = 0.0
+_PRUNE_INTERVAL_S: float = 60.0  # prune at most once every 60 seconds
 
 
 def _limit_for(request: Request) -> tuple[int, int, str]:
@@ -58,6 +61,15 @@ def _consume_quota_in_memory(scope: str, limit: int, window_s: int) -> tuple[boo
     retry_after = max(1, int(window_s - (now % window_s)) + 1)
 
     with _QUOTA_LOCK:
+        # If tracking too many keys and this key is new, reject/shed or evict
+        if key not in _QUOTA_WINDOWS and len(_QUOTA_WINDOWS) >= _MAX_TRACKED_KEYS:
+            # Force immediate cleanup
+            _prune_quota_windows_locked(now)
+            if len(_QUOTA_WINDOWS) >= _MAX_TRACKED_KEYS:
+                # Still saturated: drop oldest arbitrary key to keep memory strictly bounded
+                oldest_key = next(iter(_QUOTA_WINDOWS))
+                del _QUOTA_WINDOWS[oldest_key]
+
         timestamps = _QUOTA_WINDOWS.get(key, [])
         # Drop entries outside the sliding window.
         cutoff = now - window_s
@@ -73,21 +85,31 @@ def _consume_quota_in_memory(scope: str, limit: int, window_s: int) -> tuple[boo
     return True, retry_after
 
 
-def _prune_quota_windows() -> None:
-    """Drop expired entries for all keys. Called opportunistically on requests."""
+def _prune_quota_windows_locked(now: float) -> None:
+    """Internal helper to drop expired entries. Must be called while holding _QUOTA_LOCK."""
+    global _LAST_PRUNE_TIME
+    _LAST_PRUNE_TIME = now
+    expired: list[str] = []
+    for k, timestamps in _QUOTA_WINDOWS.items():
+        # Windows are at most 1 hour; prune anything older than 2 hours.
+        cutoff = now - 7200
+        recent = [t for t in timestamps if t > cutoff]
+        if recent:
+            _QUOTA_WINDOWS[k] = recent
+        else:
+            expired.append(k)
+    for k in expired:
+        del _QUOTA_WINDOWS[k]
+
+
+def _maybe_prune_quota_windows() -> None:
+    """Drop expired entries periodically (at most once every _PRUNE_INTERVAL_S)."""
     now = time.monotonic()
+    if now - _LAST_PRUNE_TIME < _PRUNE_INTERVAL_S:
+        return
     with _QUOTA_LOCK:
-        expired: list[str] = []
-        for key, timestamps in _QUOTA_WINDOWS.items():
-            # Windows are at most 1 hour; prune anything older than 2 hours.
-            cutoff = now - 7200
-            recent = [t for t in timestamps if t > cutoff]
-            if recent:
-                _QUOTA_WINDOWS[key] = recent
-            else:
-                expired.append(key)
-        for key in expired:
-            del _QUOTA_WINDOWS[key]
+        if now - _LAST_PRUNE_TIME >= _PRUNE_INTERVAL_S:
+            _prune_quota_windows_locked(now)
 
 
 class EcoraceJsonFormatter(JsonFormatter):
@@ -143,8 +165,8 @@ async def request_id_middleware(request: Request, call_next):
             limit, window_s, group = _limit_for(request)
             client = request.client.host if request.client else "unknown"
             allowed, retry_after = _consume_quota_in_memory(f"{client}:{group}", limit, window_s)
-            # Opportunistically prune old quota entries to bound memory.
-            _prune_quota_windows()
+            # Opportunistically prune old quota entries periodically without scanning on every request.
+            _maybe_prune_quota_windows()
             response = await call_next(request) if allowed else JSONResponse(
                 status_code=429,
                 headers={"Retry-After": str(retry_after)},
