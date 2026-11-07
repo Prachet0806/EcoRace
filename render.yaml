@@ -10,7 +10,7 @@ services:
     runtime: docker
     # The stateless solver still needs adequate memory for 24-race OR-Tools solves.
     # Benchmark on the target container before choosing a smaller plan.
-    plan: 1c-2g
+    plan: free
     dockerfilePath: backend/Dockerfile
     dockerContext: .
     healthCheckPath: /api/v1/health
