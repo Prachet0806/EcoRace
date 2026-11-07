@@ -333,24 +333,24 @@ def test_cors_allows_configured_origin():
 # ---------------------------------------------------------------------------
 
 
-def test_in_memory_rate_limiting_resets_across_new_app_instances(monkeypatch):
-    """In-memory quotas are process-local: a new app instance starts with a fresh counter."""
+def test_in_memory_rate_limiting_is_process_local_and_tracks_quota(monkeypatch):
+    """In-memory quotas are process-local: requests track against sliding window."""
     monkeypatch.setenv("RATE_LIMIT_HEALTH", "1/minute")
-    # Use a unique client address to avoid colliding with the shared module-level client.
+    # Use a unique client address to avoid colliding with other tests.
     client_address = (f"quota-{uuid.uuid4()}", 51000)
 
-    first_app = create_app()
-    isolated = TestClient(first_app, client=client_address)
+    app = create_app()
+    isolated = TestClient(app, client=client_address)
     assert isolated.get("/api/v1/health").status_code == 200
-    # Second request exhausts the per-minute limit.
+    # Second request from the same client exhausts the per-minute limit.
     limited = isolated.get("/api/v1/health")
     assert limited.status_code == 429
     assert limited.json()["error"]["code"] == "RATE_LIMITED"
     assert int(limited.headers["Retry-After"]) >= 1
 
-    # A fresh app instance has a separate in-memory counter — the quota resets.
-    second_app = create_app()
-    fresh = TestClient(second_app, client=client_address)
+    # In the same process, a different client IP gets its own independent quota.
+    other_client = (f"quota-{uuid.uuid4()}", 51001)
+    fresh = TestClient(app, client=other_client)
     assert fresh.get("/api/v1/health").status_code == 200
 
 
@@ -429,15 +429,24 @@ def test_circuit_breaker_recovers_after_cooldown(monkeypatch):
     """Circuit breaker closes after cooldown and allows the next request."""
     import time
 
-    monkeypatch.setenv("SOLVER_CIRCUIT_BREAKER_COOLDOWN_S", "0")
+    monkeypatch.setenv("SOLVER_CIRCUIT_BREAKER_COOLDOWN_S", "10")
     test_app = create_app()
     breaker = test_app.state.circuit_breaker
+    current_time = 1000.0
+
+    monkeypatch.setattr(time, "time", lambda: current_time)
+
     # Open the breaker.
     for _ in range(breaker.failure_threshold):
         breaker.record_failure()
     assert breaker.is_open()
-    # After cooldown (0s), the breaker should allow a half-open probe.
-    time.sleep(0.01)
+
+    # Advance time within cooldown window — breaker remains open.
+    current_time += 5.0
+    assert breaker.is_open()
+
+    # Advance time past cooldown — breaker closes on next query.
+    current_time += 6.0
     assert not breaker.is_open()
 
 
