@@ -1,42 +1,32 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { EcoRaceApiError, api } from "@/lib/api-client";
 import type { RunPayload } from "@/lib/types";
+import { getRun } from "@/lib/recent-runs";
 
 export type LoadState =
   | { state: "loading" }
-  | { state: "ready"; run: RunPayload; source: "session" | "api" }
+  | { state: "ready"; run: RunPayload; source: "session" }
   | { state: "missing" }
-  | { state: "error"; code: string; message: string };
+  | { state: "invalid" };
 
-// Results loader: sessionStorage stash first, then persisted API data.
-// On an ephemeral deployment, browser storage may outlive the API database.
+// Results loader: sessionStorage only. The backend does not retain run history,
+// so a missing or corrupt stash means the result is unavailable in this session.
 export function useRunResult(runId: string): LoadState {
   const [load, setLoad] = useState<LoadState>({ state: "loading" });
 
   useEffect(() => {
     let cancelled = false;
     try {
-      const raw = sessionStorage.getItem(`ecorace:run:${runId}`);
-      if (raw) {
-        const run = JSON.parse(raw) as RunPayload;
+      const run = getRun(runId);
+      if (run) {
         if (!cancelled) setLoad({ state: "ready", run, source: "session" });
         return;
       }
+      if (!cancelled) setLoad({ state: "missing" });
     } catch {
-      // Corrupt stash: fall through to API.
+      if (!cancelled) setLoad({ state: "invalid" });
     }
-    api
-      .getRun(runId)
-      .then((run) => {
-        if (!cancelled) setLoad({ state: "ready", run: run as unknown as RunPayload, source: "api" });
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        if (e instanceof EcoRaceApiError && e.code === "RUN_NOT_FOUND") setLoad({ state: "missing" });
-        else setLoad({ state: "error", code: e instanceof EcoRaceApiError ? e.code : "REQUEST_FAILED", message: e instanceof Error ? e.message : "Failed to load result." });
-      });
     return () => {
       cancelled = true;
     };

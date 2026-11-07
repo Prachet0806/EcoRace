@@ -23,7 +23,7 @@ from ecorace.domain.calendar.scenario import (
     UnknownCircuit,
     validate_scenario,
 )
-from ecorace.infrastructure import data_loader, persistence
+from ecorace.infrastructure import data_loader
 from ecorace.optimization.model import OptimizationResult, SolverConfig, SolveStatus
 from ecorace.optimization.pipeline import InfeasibleProblem, build_problem, optimize
 from ecorace.optimization.validator import SolutionValidator
@@ -60,8 +60,6 @@ def create_scenario(
     summer_break_start: int | None = None,
     summer_break_end: int | None = None,
     pin_end_to_dec_week1: bool = False,
-    *,
-    persist: bool = True,
 ) -> dict:
     circuits, _ = data_loader.circuits_bundle()
     weekends = data_loader.season(season_year)
@@ -92,8 +90,6 @@ def create_scenario(
         "weekend_count": len(weekends),
         "horizon": {"start": weekends[0].id, "end": weekends[-1].id},
     }
-    if persist:
-        persistence.save_scenario(result)
     return result
 
 

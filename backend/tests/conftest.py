@@ -1,9 +1,6 @@
-"""Keep API tests away from the development database."""
+"""Configure test-environment settings that apply before any module import."""
 
 import os
-import tempfile
-from pathlib import Path
 
-_test_dir = tempfile.TemporaryDirectory(prefix="ecorace-tests-")
-os.environ["ECORACE_DB_PATH"] = str(Path(_test_dir.name) / "ecorace.db")
+# High rate limit so tests that run many API calls are not blocked.
 os.environ["RATE_LIMIT_RUNS"] = "1000/minute"

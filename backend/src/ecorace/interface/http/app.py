@@ -15,9 +15,8 @@ Config (env):
   RATE_LIMIT_CIRCUITS: circuits endpoint limit (default 60/minute)
   RATE_LIMIT_WEEKENDS: season weekends endpoint limit (default 60/minute)
   RATE_LIMIT_RUNS: optimization creation limit (default 10/minute)
-  RATE_LIMIT_GET_RUN: result read limit (default 60/minute)
   SOLVER_MAX_CONCURRENT: solver slots per process (default 1)
-  ECORACE_DB_PATH: SQLite database path (default ./data/ecorace.db)
+  ECORACE_MAX_REQUEST_BYTES: maximum request body size (default 16384)
 """
 
 from __future__ import annotations
@@ -29,7 +28,6 @@ import socket
 import threading
 
 from ecorace.application.optimization_service import AppError
-from ecorace.infrastructure import persistence
 from ecorace.interface.http.errors import (
     app_error_handler,
     internal_error_handler,
@@ -94,7 +92,7 @@ def create_app() -> FastAPI:
             else ""
         ),
         allow_methods=["GET", "POST"],
-        allow_headers=["content-type", "idempotency-key", "x-request-id"],
+        allow_headers=["content-type", "x-request-id"],
         expose_headers=["x-request-id", "retry-after"],
     )
 
@@ -110,10 +108,6 @@ def create_app() -> FastAPI:
     app.state.solver_slots = threading.BoundedSemaphore(
         max(1, int(os.environ.get("SOLVER_MAX_CONCURRENT", "1")))
     )
-
-    # Initialize database
-    persistence.init_db()
-    persistence.interrupt_running_submissions()
 
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(RequestValidationError, validation_handler)

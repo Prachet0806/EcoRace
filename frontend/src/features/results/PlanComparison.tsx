@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api-client";
-import { recentRunIds, rememberRun } from "@/lib/recent-runs";
+import { getRun, recentRunIds, saveRun } from "@/lib/recent-runs";
 import type { RunPayload } from "@/lib/types";
 
 function metric(value: number | undefined): string {
@@ -16,7 +15,8 @@ export function PlanComparison({ run }: { run: RunPayload }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    rememberRun(run.run_id);
+    // Ensure this run is saved before building the comparison list.
+    saveRun(run);
     setOptions(recentRunIds().filter((id) => id !== run.run_id));
     setSelected("");
     setOther(null);
@@ -24,13 +24,15 @@ export function PlanComparison({ run }: { run: RunPayload }) {
 
   useEffect(() => {
     if (!selected) return;
-    let active = true;
-    api.getRun(selected).then((result) => {
-      if (active) { setOther(result); setError(""); }
-    }).catch(() => {
-      if (active) { setOther(null); setError("That earlier result is unavailable in the current database."); }
-    });
-    return () => { active = false; };
+    // Load from session storage only — the backend does not retain run history.
+    const result = getRun(selected);
+    if (result) {
+      setOther(result);
+      setError("");
+    } else {
+      setOther(null);
+      setError("That earlier result is no longer available in this browser session.");
+    }
   }, [selected]);
 
   if (options.length === 0) return null;

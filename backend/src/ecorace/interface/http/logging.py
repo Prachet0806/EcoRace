@@ -1,11 +1,11 @@
-"""Structured JSON logging + request ID middleware."""
+"""Structured JSON logging + request ID middleware with in-memory rate limiting."""
 
 from __future__ import annotations
 
 import logging
 import os
 import re
-import sqlite3
+import threading
 import time
 import uuid
 from contextvars import ContextVar
@@ -14,11 +14,17 @@ from typing import Any
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from pythonjsonlogger.jsonlogger import JsonFormatter
-from ecorace.infrastructure import persistence
 
 request_id_var: ContextVar[str] = ContextVar("request_id", default="")
 _REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 _QUOTA = re.compile(r"^([1-9][0-9]*)/(second|minute|hour)$")
+
+# In-memory sliding-window rate limiter state.
+# Key: f"{client_ip}:{group}" -> list of request timestamps (monotonic seconds).
+# Guarded by _QUOTA_LOCK for thread safety.
+_QUOTA_WINDOWS: dict[str, list[float]] = {}
+_QUOTA_LOCK = threading.Lock()
+_MAX_ENTRIES_PER_KEY = 1000  # bound memory per client+group
 
 
 def _limit_for(request: Request) -> tuple[int, int, str]:
@@ -40,6 +46,48 @@ def _limit_for(request: Request) -> tuple[int, int, str]:
     if match is None:
         raise ValueError(f"Invalid {env}: {setting}")
     return int(match[1]), {"second": 1, "minute": 60, "hour": 3600}[match[2]], group
+
+
+def _consume_quota_in_memory(scope: str, limit: int, window_s: int) -> tuple[bool, int]:
+    """In-memory sliding-window quota check.
+
+    Returns (allowed, retry_after_seconds).
+    """
+    now = time.monotonic()
+    key = scope
+    retry_after = max(1, int(window_s - (now % window_s)) + 1)
+
+    with _QUOTA_LOCK:
+        timestamps = _QUOTA_WINDOWS.get(key, [])
+        # Drop entries outside the sliding window.
+        cutoff = now - window_s
+        recent = [t for t in timestamps if t > cutoff]
+        if len(recent) >= limit:
+            _QUOTA_WINDOWS[key] = recent
+            return False, retry_after
+        recent.append(now)
+        # Bound memory: keep only the most recent entries per key.
+        if len(recent) > _MAX_ENTRIES_PER_KEY:
+            recent = recent[-_MAX_ENTRIES_PER_KEY:]
+        _QUOTA_WINDOWS[key] = recent
+    return True, retry_after
+
+
+def _prune_quota_windows() -> None:
+    """Drop expired entries for all keys. Called opportunistically on requests."""
+    now = time.monotonic()
+    with _QUOTA_LOCK:
+        expired: list[str] = []
+        for key, timestamps in _QUOTA_WINDOWS.items():
+            # Windows are at most 1 hour; prune anything older than 2 hours.
+            cutoff = now - 7200
+            recent = [t for t in timestamps if t > cutoff]
+            if recent:
+                _QUOTA_WINDOWS[key] = recent
+            else:
+                expired.append(key)
+        for key in expired:
+            del _QUOTA_WINDOWS[key]
 
 
 class EcoraceJsonFormatter(JsonFormatter):
@@ -94,16 +142,14 @@ async def request_id_middleware(request: Request, call_next):
         elif request.url.path.startswith("/api/v1/") and request.method != "OPTIONS":
             limit, window_s, group = _limit_for(request)
             client = request.client.host if request.client else "unknown"
-            try:
-                allowed, retry_after = persistence.consume_quota(f"{client}:{group}", limit, window_s)
-            except (sqlite3.Error, RuntimeError):
-                response = JSONResponse(status_code=503, content=envelope("DATABASE_UNAVAILABLE", "Database temporarily unavailable."))
-            else:
-                response = await call_next(request) if allowed else JSONResponse(
-                    status_code=429,
-                    headers={"Retry-After": str(retry_after)},
-                    content=envelope("RATE_LIMITED", "Request quota exceeded."),
-                )
+            allowed, retry_after = _consume_quota_in_memory(f"{client}:{group}", limit, window_s)
+            # Opportunistically prune old quota entries to bound memory.
+            _prune_quota_windows()
+            response = await call_next(request) if allowed else JSONResponse(
+                status_code=429,
+                headers={"Retry-After": str(retry_after)},
+                content=envelope("RATE_LIMITED", "Request quota exceeded."),
+            )
         else:
             response = await call_next(request)
         response.headers["x-request-id"] = rid

@@ -1,4 +1,14 @@
-"""A completed result remains retrievable after a real API process restart."""
+"""Backend restart test: stateless pilot.
+
+Verifies that:
+- The API starts cleanly without a database or persistent disk.
+- Health and reference-data endpoints respond after a restart.
+- A new optimization can be submitted after a restart.
+- The backend does NOT retain run history across restarts (expected behavior).
+
+The browser session test (session-storage retention after a backend restart) is
+covered by the Playwright e2e suite.
+"""
 
 from __future__ import annotations
 
@@ -7,12 +17,9 @@ import socket
 import subprocess
 import sys
 import time
-import uuid
 from pathlib import Path
 
 import httpx
-
-from ecorace.infrastructure import data_loader, db_admin, persistence
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -23,18 +30,40 @@ def _free_port() -> int:
         return probe.getsockname()[1]
 
 
-def _start(port: int, db_path: Path) -> subprocess.Popen:
+def _start(port: int) -> subprocess.Popen:
+    """Start the API without any database configuration."""
     env = os.environ.copy()
-    env.update({
-        "PYTHONPATH": str(ROOT / "backend" / "src"),
-        "ECORACE_DB_PATH": str(db_path),
-        "ECORACE_REQUIRE_PERSISTENT_DB": "0",
-        "SOLVER_TIMEOUT_SECONDS": "3",
-        "RATE_LIMIT_RUNS": "1000/minute",
-    })
+    env.update(
+        {
+            "PYTHONPATH": str(ROOT / "backend" / "src"),
+            "SOLVER_TIMEOUT_SECONDS": "5",
+            "RATE_LIMIT_RUNS": "1000/minute",
+        }
+    )
+    # Explicitly remove any DB-related env vars to prove they are not needed.
+    for key in (
+        "ECORACE_DB_PATH",
+        "ECORACE_DB_MOUNT",
+        "ECORACE_REQUIRE_PERSISTENT_DB",
+        "ECORACE_DB_BUSY_TIMEOUT_S",
+    ):
+        env.pop(key, None)
+
     process = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "ecorace.interface.http.app:app", "--host", "127.0.0.1", "--port", str(port)],
-        cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "ecorace.interface.http.app:app",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+        ],
+        cwd=ROOT,
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
     endpoint = f"http://127.0.0.1:{port}/api/v1/health"
     for _ in range(100):
@@ -60,34 +89,81 @@ def _stop(process: subprocess.Popen) -> None:
         process.wait(timeout=10)
 
 
-def test_run_survives_api_process_restart(tmp_path):
+def test_database_free_restart():
+    """
+    Backend restart sequence (stateless):
+    1. Start API without DB config.
+    2. Submit an optimization, capture the result.
+    3. Stop API (simulates restart/redeploy).
+    4. Start API again without DB config.
+    5. Health and reference-data endpoints work.
+    6. A new optimization can be submitted.
+    7. The old result is NOT available from the backend (expected — browser owns it).
+    """
     port = _free_port()
-    db_path = tmp_path / "restart.db"
     base = f"http://127.0.0.1:{port}/api/v1"
-    key = str(uuid.uuid4())
+
+    from ecorace.infrastructure import data_loader
     ids = [c["id"] for c in data_loader.circuit_list_sorted()][:20]
-    payload = {"race_count": 20, "circuit_ids": ids, "budget_s": 3}
-    process = _start(port, db_path)
+    payload = {"race_count": 20, "circuit_ids": ids, "budget_s": 5}
+
+    # --- First instance ---
+    process = _start(port)
     try:
-        created = httpx.post(f"{base}/optimization/runs", json=payload, headers={"Idempotency-Key": key}, timeout=30)
+        # Health check without database
+        health = httpx.get(f"{base}/health", timeout=5)
+        assert health.status_code == 200
+        assert health.json()["status"] == "ok"
+        assert "database" not in health.json()
+
+        # Circuits endpoint works
+        circuits = httpx.get(f"{base}/circuits", timeout=5)
+        assert circuits.status_code == 200
+
+        # Submit optimization
+        created = httpx.post(
+            f"{base}/optimization/runs", json=payload, timeout=30
+        )
         assert created.status_code == 200, created.text
         run_id = created.json()["run_id"]
+        assert run_id.startswith("run_")
+        # Verify complete result is in the response body
+        result_body = created.json()
+        assert result_body["calendar"]["race_count"] == 20
+        assert all(c["satisfied"] for c in result_body["constraints"])
+
+        # Backend does NOT expose a result-retrieval endpoint
+        lookup = httpx.get(f"{base}/optimization/runs/{run_id}", timeout=5)
+        assert lookup.status_code == 404
     finally:
         _stop(process)
 
-    process = _start(port, db_path)
+    # --- Second instance (restart, no DB) ---
+    process = _start(port)
     try:
-        retrieved = httpx.get(f"{base}/optimization/runs/{run_id}", timeout=10)
-        assert retrieved.status_code == 200, retrieved.text
-        assert retrieved.json()["run_id"] == run_id
-        replayed = httpx.post(f"{base}/optimization/runs", json=payload, headers={"Idempotency-Key": key}, timeout=10)
-        assert replayed.status_code == 200
-        assert replayed.json()["run_id"] == run_id
+        # Health works after restart without a database
+        health = httpx.get(f"{base}/health", timeout=5)
+        assert health.status_code == 200
+        assert health.json()["status"] == "ok"
+
+        # Reference data works
+        circuits = httpx.get(f"{base}/circuits", timeout=5)
+        assert circuits.status_code == 200
+
+        weekends = httpx.get(f"{base}/seasons/2026/weekends", timeout=5)
+        assert weekends.status_code == 200
+
+        # Old run_id is NOT retrievable (expected — browser session owns the result)
+        lookup = httpx.get(f"{base}/optimization/runs/{run_id}", timeout=5)
+        assert lookup.status_code == 404
+
+        # A fresh optimization can be submitted after restart
+        new_result = httpx.post(
+            f"{base}/optimization/runs", json=payload, timeout=30
+        )
+        assert new_result.status_code == 200, new_result.text
+        new_run_id = new_result.json()["run_id"]
+        assert new_run_id.startswith("run_")
+        assert new_run_id != run_id  # New run, new ID
     finally:
         _stop(process)
-
-    report = db_admin.inspect_database(db_path)
-    assert report["schema_version"] == persistence.SCHEMA_VERSION
-    assert report["integrity"] == "ok"
-    assert report["foreign_key_violations"] == 0
-    assert (report["scenarios"], report["runs"]) == (1, 1)

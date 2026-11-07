@@ -23,8 +23,7 @@ const SelectionMap = dynamic(() => import("@/features/geography/SelectionMap").t
   loading: () => <p className="font-tel text-sm text-mute">Loading preview…</p>,
 });
 import { EcoRaceApiError, api } from "@/lib/api-client";
-import { rememberRun } from "@/lib/recent-runs";
-import { uuidv4 } from "@/lib/uuid";
+import { saveRun } from "@/lib/recent-runs";
 import { MAX_RACES, MIN_RACES, selectionError, useScenarioStore } from "@/lib/scenario-store";
 
 // Builder workstation v2.1: header → status → workspace → geography →
@@ -104,32 +103,13 @@ export default function EcoRacePage() {
         summer_break_end: summerBreak?.end ?? null,
         pin_end_to_dec_week1: pinEnd,
       };
-      const serialized = JSON.stringify(body);
-      let key = uuidv4();
       try {
-        const previous = JSON.parse(localStorage.getItem("ecorace:pending-run") ?? "null") as { body?: string; key?: string } | null;
-        if (previous?.body === serialized && previous.key) key = previous.key;
-        localStorage.setItem("ecorace:pending-run", JSON.stringify({ body: serialized, key }));
-      } catch {
-        // Private browsing can disable storage; this submission still works.
-      }
-      try {
-        let result: RunPayload;
+        const result = await api.createRun(body);
         try {
-          result = await api.createRun(body, key);
-        } catch (e) {
-          if (!(e instanceof EcoRaceApiError) || e.code !== "REQUEST_IN_PROGRESS") throw e;
-          const submission = await api.getSubmission(key);
-          if (submission.status !== "completed" || !submission.run_id) throw e;
-          result = await api.getRun(submission.run_id);
-        }
-        try {
-          sessionStorage.setItem(`ecorace:run:${result.run_id}`, JSON.stringify(result));
+          saveRun(result);
         } catch {
-          // Storage full/blocked: results route falls back to API refetch.
+          // Storage full/blocked: the optimization result is still valid in React state.
         }
-        try { localStorage.removeItem("ecorace:pending-run"); } catch { /* Storage unavailable. */ }
-        rememberRun(result.run_id);
         setDone(result.run_id);
         router.push(`/results/${result.run_id}`);
       } catch (e: unknown) {

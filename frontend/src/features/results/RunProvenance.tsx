@@ -4,7 +4,8 @@ import type { RunPayload } from "@/lib/types";
 
 // Run provenance: reproducibility surfaced as product copy. Every field
 // comes from the stored run payload — never reconstructed or invented.
-export function RunProvenance({ run, source }: { run: RunPayload; source: "session" | "api" }) {
+// Results are session-only: the backend does not retain run history.
+export function RunProvenance({ run }: { run: RunPayload }) {
   const rows: Array<[string, string]> = [
     ["Run ID", run.run_id],
     ["Data version", run.data_version],
@@ -23,7 +24,7 @@ export function RunProvenance({ run, source }: { run: RunPayload; source: "sessi
       ? `${run.provenance.quality_selection.selected_extra_distance_pct}% beyond the shortest validated candidate to favor fewer region re-entries and long hops`
       : "not recorded"],
     ["Optimality", run.solver.optimality_proven ? "proven optimal" : "best found (not proven)"],
-    ["Loaded from", source === "session" ? "this browser" : "API"],
+    ["Stored in", "browser session (this tab only)"],
   ];
   return (
     <section aria-label="Run information" className="rounded-xl border border-hairline bg-card p-4">

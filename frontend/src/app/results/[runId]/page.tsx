@@ -56,15 +56,22 @@ export default function ResultsPage({ params }: { params: Promise<{ runId: strin
     );
   }
 
-  if (load.state === "missing") {
+  if (load.state === "missing" || load.state === "invalid") {
+    const isInvalid = load.state === "invalid";
     return (
       <AppShell onBack={back}>
         <PageContainer>
           <div className="flex min-h-[55vh] max-w-xl flex-col justify-center">
             <h1 className="font-display text-3xl font-medium">Result not available</h1>
             <p className="mt-3 text-sm leading-6 text-mute">
-              Run <span className="font-tel">{runId}</span> was not found in the current database.
-              Check the link or run the optimization again.
+              {isInvalid
+                ? "The stored result for this run is corrupted and cannot be displayed."
+                : <>
+                    Run <span className="font-tel">{runId}</span> is not available in this browser session.
+                    Results are kept in session storage only and are cleared when the tab is closed.
+                  </>
+              }
+              {" "}Run the optimization again to generate a new result.
             </p>
             <button type="button" onClick={back} className="mt-5 self-start rounded-lg bg-rosso px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-rosso-hi">
               Return to planner
@@ -75,25 +82,7 @@ export default function ResultsPage({ params }: { params: Promise<{ runId: strin
     );
   }
 
-  if (load.state === "error") {
-    return (
-      <AppShell onBack={back}>
-        <PageContainer>
-          <div className="flex min-h-[55vh] max-w-xl flex-col justify-center">
-            <h1 className="font-display text-3xl font-medium">Could not load result</h1>
-            <p role="alert" className="mt-3 rounded-lg border border-rosso-ink/40 p-3 text-sm text-rosso-ink">
-              {load.code}: {load.message}
-            </p>
-            <button type="button" onClick={back} className="mt-5 self-start rounded-lg bg-rosso px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-rosso-hi">
-              Return to planner
-            </button>
-          </div>
-        </PageContainer>
-      </AppShell>
-    );
-  }
-
-  const { run, source } = load;
+  const { run } = load;
   return (
     <AppShell onBack={back}>
       <PageContainer>
@@ -104,7 +93,7 @@ export default function ResultsPage({ params }: { params: Promise<{ runId: strin
               Optimized {run.season_year} calendar
             </>
           }
-          meta={`${run.run_id} · season ${run.season_year} · ${run.calendar.race_count} races · loaded from ${source === "session" ? "this browser" : "API"}`}
+          meta={`${run.run_id} · season ${run.season_year} · ${run.calendar.race_count} races · this browser session`}
           badge={
             <span className="rounded-md border border-hairline px-3 py-1 font-tel text-xs text-mute">
               {run.status === "feasible_timeout" ? "Feasible · time limit reached" : run.status === "feasible" ? "Feasible" : run.status.replaceAll("_", " ")}
@@ -136,7 +125,7 @@ export default function ResultsPage({ params }: { params: Promise<{ runId: strin
           <ConstraintDiagnostics run={run} />
         </div>
 
-        <RunProvenance run={run} source={source} />
+        <RunProvenance run={run} />
       </PageContainer>
     </AppShell>
   );

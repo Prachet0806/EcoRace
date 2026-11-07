@@ -14,6 +14,18 @@ export function SelectionStatus({ selectedCount, raceCount }: Props) {
   const err = selectionError(selectedCount, raceCount);
   const pct = Math.min(100, Math.round((selectedCount / raceCount) * 100));
   const tone = err === null ? "ready" : selectedCount > raceCount ? "error" : "warn";
+
+  // Move from red (low) to yellow (intermediate) to green (required number reached).
+  // If selection exceeds the required number, keep alert tone (red).
+  const barColor =
+    selectedCount === raceCount
+      ? "bg-pass"
+      : selectedCount > raceCount
+        ? "bg-rosso"
+        : pct >= 50
+          ? "bg-giallo"
+          : "bg-rosso";
+
   return (
     <section aria-label="Selection status" className="rounded-xl border border-hairline bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -33,7 +45,7 @@ export function SelectionStatus({ selectedCount, raceCount }: Props) {
         aria-label="Circuits selected"
       >
         <div
-          className="h-full bg-mute/60"
+          className={`h-full transition-all duration-300 ease-out ${barColor}`}
           style={{ width: `${pct}%` }}
         />
       </div>
