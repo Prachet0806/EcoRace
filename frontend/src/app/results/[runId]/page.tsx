@@ -96,7 +96,11 @@ export default function ResultsPage({ params }: { params: Promise<{ runId: strin
               Optimized {run.season_year} calendar
             </>
           }
-          meta={`${run.run_id} · season ${run.season_year} · ${run.calendar.race_count} races · this browser session`}
+          meta={
+            <span className="font-tel text-xs text-mute">
+              {run.run_id} · season {run.season_year} · {run.calendar.race_count} races · this browser session
+            </span>
+          }
           badge={
             <span className="rounded-md border border-hairline px-3 py-1 font-tel text-xs text-mute">
               {run.status === "feasible_timeout" ? "Feasible · time limit reached" : run.status === "feasible" ? "Feasible" : run.status.replaceAll("_", " ")}

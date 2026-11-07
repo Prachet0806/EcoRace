@@ -76,6 +76,10 @@ export function getStoredRun(runId: string): StoredRunResult {
     return { status: "corrupt", reason: "Payload schema mismatch or missing required fields" };
   }
 
+  if (parsed.run_id !== runId) {
+    return { status: "corrupt", reason: "Payload run_id does not match the requested run_id" };
+  }
+
   const { _savedAt, ...run } = parsed as RunPayload & { _savedAt?: number };
   return { status: "found", run: run as RunPayload };
 }

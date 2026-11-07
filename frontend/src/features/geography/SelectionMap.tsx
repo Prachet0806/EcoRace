@@ -109,13 +109,25 @@ export function SelectionMap({ selected }: Props) {
   }
 
   return (
-    <section aria-label="Geographic preview" className="rounded-xl border border-hairline bg-card p-4">
-      <div className="mb-2 flex items-baseline justify-between">
-        <SectionLabel>Geographic preview</SectionLabel>
-        <p className="font-tel text-xs text-mute">{selected.length} plotted</p>
+    <section aria-label="Geographic preview" className="rounded-xl border border-hairline bg-card p-5">
+      <div className="mb-3 flex items-baseline justify-between">
+        <div>
+          <span className="font-tel text-xs font-semibold uppercase tracking-wider text-mute">Selected circuit locations</span>
+          <h3 className="font-display text-base font-medium text-ink mt-0.5">Interactive map preview</h3>
+        </div>
+        <span className="rounded-md border border-hairline bg-lift px-2.5 py-1 font-tel text-xs text-mute">
+          Live selection · {selected.length} plotted
+        </span>
       </div>
-      <div ref={containerRef} role="img" aria-label={`World map showing ${selected.length} selected circuit locations`} className="h-72 w-full rounded-lg border border-hairline" />
-      <p className="mt-1 text-xs text-mute">Live footprint of your selection — the optimizer turns this into a route.</p>
+      <div
+        ref={containerRef}
+        role="img"
+        aria-label={`World map showing ${selected.length} selected circuit locations`}
+        className="h-72 w-full rounded-lg border border-hairline overflow-hidden"
+      />
+      <p className="mt-2 text-xs text-mute">
+        Live geographic footprint of selected venues. Geographic distribution is descriptive; route quality is evaluated during optimization.
+      </p>
     </section>
   );
 }

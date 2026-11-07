@@ -1,51 +1,134 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import type { SummerBreak } from "@/lib/scenario-store";
 
 interface Props {
   disabled: boolean;
   disabledReason: string | null;
   running: boolean;
-  summary: string;
+  selectedCount: number;
+  seasonYear: number;
+  maxConsecutive: number;
+  summerBreak: SummerBreak | null | undefined;
+  pinEnd: boolean;
+  apiError: string | null;
   onOptimize: () => void;
 }
 
-// Command center: one primary action with its exact input summary.
-// Running shows elapsed time and an indeterminate bar, never a fake percentage.
-export function OptimizationCommand({ disabled, disabledReason, running, summary, onOptimize }: Props) {
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => {
-    if (!running) return;
-    const started = Date.now();
-    setElapsed(0);
-    const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
-    return () => window.clearInterval(timer);
-  }, [running]);
+export function OptimizationCommand({
+  disabled,
+  disabledReason,
+  running,
+  selectedCount,
+  seasonYear,
+  maxConsecutive,
+  summerBreak,
+  pinEnd,
+  apiError,
+  onOptimize,
+}: Props) {
+  const isReady = !disabled && !running;
+
+  // Contextual readiness status line
+  let statusText: string;
+  let statusTone: "ready" | "warn" | "error" | "running";
+
+  if (running) {
+    statusText = "Optimization is in progress";
+    statusTone = "running";
+  } else if (apiError) {
+    statusText = "The circuit library or optimization service is unavailable";
+    statusTone = "error";
+  } else if (disabled && disabledReason) {
+    statusText = disabledReason;
+    statusTone = "warn";
+  } else if (isReady) {
+    statusText = "Your scenario is ready to optimize";
+    statusTone = "ready";
+  } else {
+    statusText = "Configure your scenario to proceed";
+    statusTone = "warn";
+  }
+
   return (
-    <section aria-label="Optimization command" className="rounded-xl border border-hairline bg-card p-5 text-center">
-      <p className="font-tel text-xs leading-5 text-mute">{summary}</p>
-      <button
-        type="button"
-        onClick={onOptimize}
-        disabled={disabled || running}
-        className="mt-3 min-h-11 rounded-lg bg-rosso px-6 py-2 font-display text-[16px] font-medium text-white transition-colors hover:bg-rosso-hi disabled:opacity-40 disabled:hover:bg-rosso"
-      >
-        {running ? "Optimizing…" : "→ Run optimization"}
-      </button>
-      {disabled && disabledReason && !running && (
-        <p role="status" className="mt-1 font-tel text-sm text-mute">
-          {disabledReason}
-        </p>
-      )}
-      {running && (
-        <div className="mx-auto mt-3 max-w-md" role="status" aria-live="polite">
-          <p className="font-tel text-sm text-mute">Solver running · {elapsed}s elapsed</p>
-          <div className="mt-1 h-1 overflow-hidden rounded bg-lift" aria-hidden="true">
-            <div className="speedline-bar h-full w-2/5 bg-rosso" />
-          </div>
-          <p className="mt-1 text-sm text-mute">Checking calendar constraints and route distance. This may take tens of seconds.</p>
+    <section aria-label="Optimization command" className="rounded-xl border border-hairline bg-card p-6">
+      {/* Part 1: Scenario Summary */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline/60 pb-4">
+        <div>
+          <span className="font-tel text-xs font-semibold uppercase tracking-wider text-mute">
+            Ready to optimize?
+          </span>
+          <h2 className="font-display text-lg font-medium text-ink mt-0.5">
+            Scenario summary
+          </h2>
         </div>
-      )}
+        <span
+          className={`rounded-md px-3 py-1 font-tel text-xs font-medium ${
+            isReady ? "bg-pass/15 text-pass" : "bg-lift text-mute"
+          }`}
+        >
+          {isReady ? "Ready" : "Incomplete"}
+        </span>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="rounded-lg border border-hairline/70 bg-base/50 p-3">
+          <span className="font-tel text-[11px] uppercase tracking-wider text-mute block">Circuits</span>
+          <span className="font-tel text-xl font-medium text-ink">{selectedCount}</span>
+        </div>
+        <div className="rounded-lg border border-hairline/70 bg-base/50 p-3">
+          <span className="font-tel text-[11px] uppercase tracking-wider text-mute block">Season</span>
+          <span className="font-tel text-xl font-medium text-ink">{seasonYear}</span>
+        </div>
+        <div className="rounded-lg border border-hairline/70 bg-base/50 p-3">
+          <span className="font-tel text-[11px] uppercase tracking-wider text-mute block">Max consecutive</span>
+          <span className="font-tel text-xl font-medium text-ink">{maxConsecutive} <span className="text-xs text-mute font-normal">races</span></span>
+        </div>
+        <div className="rounded-lg border border-hairline/70 bg-base/50 p-3">
+          <span className="font-tel text-[11px] uppercase tracking-wider text-mute block">Summer break</span>
+          <span className="font-tel text-base font-medium text-ink">
+            {summerBreak ? `W${summerBreak.start + 1}–W${summerBreak.end + 1}` : "None"}
+          </span>
+        </div>
+      </div>
+
+      <p className="mt-3 text-xs leading-relaxed text-mute">
+        Your configuration will be submitted to the EcoRace optimizer. The resulting calendar will be checked against the scheduling constraints.
+      </p>
+
+      {/* Part 2: Primary Action */}
+      <div className="mt-6 flex flex-col items-center justify-center">
+        <button
+          type="button"
+          onClick={onOptimize}
+          disabled={disabled || running}
+          className="min-h-12 w-full max-w-md rounded-xl bg-rosso px-8 py-3 font-display text-lg font-medium text-white transition-all hover:bg-rosso-hi active:scale-[0.99] disabled:opacity-40 disabled:hover:bg-rosso disabled:active:scale-100 shadow-md"
+        >
+          {running ? "Optimizing…" : "→ Run optimization"}
+        </button>
+        <span className="font-tel text-xs text-mute mt-1.5">
+          Run the EcoRace optimization engine
+        </span>
+      </div>
+
+      {/* Part 3: Readiness Explanation */}
+      <div className="mt-4 text-center">
+        <p
+          role="status"
+          aria-live="polite"
+          className={`font-tel text-xs font-medium ${
+            statusTone === "ready"
+              ? "text-pass"
+              : statusTone === "error"
+              ? "text-rosso-ink"
+              : statusTone === "running"
+              ? "text-giallo"
+              : "text-mute"
+          }`}
+        >
+          {statusText}
+        </p>
+      </div>
     </section>
   );
 }
