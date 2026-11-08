@@ -48,7 +48,7 @@ export function SelectionStatus({ selectedCount, raceCount }: Props) {
     <section aria-label="Selection status" className="rounded-xl border border-hairline bg-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <span className="font-tel text-xs font-semibold uppercase tracking-wider text-mute">Circuit selection</span>
+          <span className="font-tel text-xs font-semibold text-mute">Circuit selection</span>
           <p className="font-tel text-sm mt-1">
             <span className="text-3xl font-medium tabular-nums">{selectedCount}</span>
             <span className="text-mute"> / {raceCount}</span>
@@ -68,7 +68,7 @@ export function SelectionStatus({ selectedCount, raceCount }: Props) {
         aria-label="Circuits selected"
       >
         <div
-          className={`h-full transition-all duration-300 ease-out ${barColor}`}
+          className={`h-full transition-[width,background-color] duration-300 ease-out ${barColor}`}
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -79,20 +79,6 @@ export function SelectionStatus({ selectedCount, raceCount }: Props) {
             ? `Target reached: ${selectedCount} circuits match the configured ${raceCount} races.`
             : err}
         </p>
-        <div className="flex flex-wrap items-center gap-3 text-mute/80">
-          <span className="flex items-center gap-1.5">
-            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-pass" />
-            Race count configured ({raceCount})
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-pass" />
-            Calendar rules available
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${err === null ? "bg-pass" : "bg-mute/60"}`} />
-            {err === null ? "Circuit selection complete" : "Circuit selection incomplete"}
-          </span>
-        </div>
       </div>
     </section>
   );

@@ -111,5 +111,5 @@ export function RouteMap({ run, hovered }: Props) {
 
   if (failed) return <p role="alert" className="rounded-lg border border-rosso-ink/40 bg-card p-4 text-sm text-rosso-ink">Map unavailable: {failed}</p>;
 
-  return <div ref={containerRef} aria-label="Route map" className="h-80 w-full rounded-xl border border-hairline md:h-[480px]" />;
+  return <div ref={containerRef} aria-label="Route map" className="h-96 w-full rounded-xl border border-hairline md:h-[560px]" />;
 }

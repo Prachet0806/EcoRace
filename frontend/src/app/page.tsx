@@ -34,7 +34,7 @@ import { MAX_RACES, MIN_RACES, selectionError, useScenarioStore } from "@/lib/sc
 // preset (membership only — dates/order are optimizer outputs).
 export default function EcoRacePage() {
   const router = useRouter();
-  const { circuits, loading, error: loadError, retry } = useCircuits();
+  const { circuits } = useCircuits();
   const {
     selectedTrackIds,
     raceCount,
@@ -165,12 +165,11 @@ export default function EcoRacePage() {
         if (calendarSource === "official-2026-venues") return;
         // Preset-load only: the 24-race set fills the left pane in order
         // (right pane empties); the user runs the optimization themselves.
-        // Guard: a stale API without enrichment fields yields an empty set —
-        // fail loudly instead of applying a broken preset.
+        // Fail loudly if the bundled catalog does not contain a valid preset.
         if (officialIds.length < MIN_RACES || officialIds.length > MAX_RACES) {
           setError(
             "OFFICIAL_PRESET_UNAVAILABLE",
-            `Official 2026 set has ${officialIds.length} venues (expected 20–24). Restart the API to serve current circuit data, then retry.`,
+            `Official 2026 set has ${officialIds.length} venues (expected 20–24). Check the frontend circuit catalog.`,
           );
           return;
         }
@@ -202,18 +201,10 @@ export default function EcoRacePage() {
           description="Design your season. Balance the grid. Optimize every weekend."
           meta={
             <div className="flex flex-wrap items-center justify-center gap-3 font-tel text-xs">
-              <span className="rounded-full border border-rosso/40 bg-rosso/10 px-3 py-1 font-semibold text-rosso-ink">
-                {raceCount} RACES
-              </span>
-              <span className="rounded-full border border-hairline bg-lift px-3 py-1 text-ink">
-                {seasonYear} SEASON
-              </span>
-              <span className="rounded-full border border-hairline bg-lift px-3 py-1 text-mute">
-                40 PLANNING WEEKENDS
-              </span>
-              <span className="rounded-full border border-hairline bg-lift px-3 py-1 text-mute">
-                {sourceLocked ? "OFFICIAL PRESET" : "CUSTOM DRAFT"}
-              </span>
+              <span className="font-semibold text-rosso-ink">{raceCount} races</span>
+              <span className="text-mute">{seasonYear} season</span>
+              <span className="text-mute">40 planning weekends</span>
+              <span className="text-mute">{sourceLocked ? "Official preset" : "Custom draft"}</span>
             </div>
           }
           badge={
@@ -232,59 +223,26 @@ export default function EcoRacePage() {
 
         <SelectionStatus selectedCount={selectedTrackIds.length} raceCount={raceCount} />
 
-        {loading && (
-          <div role="status" aria-label="Loading circuit library">
-            <p className="font-tel text-sm text-mute">Loading circuit library…</p>
-            <div className="mt-2 grid gap-4 md:grid-cols-2" aria-hidden="true">
-              {[0, 1].map((i) => (
-                <div key={i} className="space-y-2 rounded-lg border border-hairline bg-card p-3">
-                  {[0, 1, 2].map((j) => (
-                    <div key={j} className="h-8 rounded bg-lift" />
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        {loadError && !loading && (
-          <div role="alert" className="rounded-lg border border-rosso-ink/40 p-4 text-sm">
-            <p className="font-medium text-rosso-ink">Circuit library unavailable</p>
-            <p className="text-mute">
-              The planner could not connect to the optimization API: {loadError} Is the API running at {api.baseUrl}?
-            </p>
-            <button
-              type="button"
-              onClick={retry}
-              className="mt-3 min-h-10 rounded-lg border border-hairline px-4 transition-colors hover:bg-lift"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-        {!loading && !loadError && (
-          <>
-            <CalendarSourceSelector
-              source={calendarSource}
-              officialCount={officialIds.length}
-              selectedCount={selectedTrackIds.length}
-              onChange={onSourceChange}
-            />
-            <TrackWorkspace
-              circuits={circuits}
-              selectedIds={selectedTrackIds}
-              seasonYear={seasonYear}
-              locked={sourceLocked}
-              onToggle={onToggle}
-              onClear={onClear}
-            />
-          </>
-        )}
+        <CalendarSourceSelector
+          source={calendarSource}
+          officialCount={officialIds.length}
+          selectedCount={selectedTrackIds.length}
+          onChange={onSourceChange}
+        />
+        <TrackWorkspace
+          circuits={circuits}
+          selectedIds={selectedTrackIds}
+          seasonYear={seasonYear}
+          locked={sourceLocked}
+          onToggle={onToggle}
+          onClear={onClear}
+        />
 
         {/* Geographic overview section */}
         <section aria-label="Geographic overview" className="space-y-4">
           <div className="text-center pt-4">
-            <p className="font-tel text-xs font-semibold uppercase tracking-widest text-mute">
-              GEOGRAPHIC OVERVIEW
+            <p className="font-tel text-xs font-semibold text-mute">
+              Geographic overview
             </p>
             <h3 className="mt-1 font-display text-xl font-semibold text-ink">
               Live circuit footprint
@@ -378,7 +336,7 @@ export default function EcoRacePage() {
             )}
 
             <OptimizationCommand
-              disabled={invalid !== null || loading || loadError !== null}
+              disabled={invalid !== null}
               disabledReason={invalid}
               running={running}
               selectedCount={selectedTrackIds.length}
@@ -386,7 +344,6 @@ export default function EcoRacePage() {
               maxConsecutive={maxConsecutive}
               summerBreak={summerBreak}
               pinEnd={pinEnd}
-              apiError={loadError}
               onOptimize={onOptimize}
             />
           </>

@@ -113,7 +113,7 @@ export function SelectionMap({ selected }: Props) {
       <div className="mb-3 flex items-baseline justify-between">
         <div>
           <span className="font-tel text-xs font-semibold uppercase tracking-wider text-mute">Selected circuit locations</span>
-          <h3 className="font-display text-base font-medium text-ink mt-0.5">Interactive map preview</h3>
+          <h3 className="font-display text-base font-medium text-ink mt-0.5">Circuit locations</h3>
         </div>
         <span className="rounded-md border border-hairline bg-lift px-2.5 py-1 font-tel text-xs text-mute">
           Live selection · {selected.length} plotted

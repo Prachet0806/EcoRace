@@ -16,13 +16,13 @@ export function ScenarioHeader({ kicker, title, description, meta, badge, center
     return (
       <header className="border-b border-hairline py-8 text-center">
         <div className="flex items-center justify-center gap-2 mb-2">
-          <p className="font-tel text-xs font-semibold uppercase tracking-widest text-mute">
+          <p className="font-tel text-xs font-semibold text-mute">
             {kicker}
           </p>
           <span className="text-mute/40">·</span>
           {badge}
         </div>
-        <h1 className="mx-auto max-w-3xl font-display text-4xl font-bold tracking-tight text-ink md:text-5xl">
+        <h1 className="mx-auto max-w-3xl font-display text-4xl font-medium tracking-tight text-ink md:text-5xl">
           {title}
         </h1>
         {description && (

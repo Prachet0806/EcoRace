@@ -78,7 +78,7 @@ export function CalendarRules({
           <div className="rounded-lg border border-hairline/80 bg-base/50 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <span className="font-tel text-xs font-semibold uppercase tracking-wider text-mute">Number of races</span>
+                <span className="font-tel text-xs font-semibold text-mute">Number of races</span>
                 <p className="text-xs text-mute mt-0.5">Allowed range: {MIN_RACES}–{MAX_RACES}</p>
               </div>
               <div className="flex items-center gap-1.5" role="group" aria-label="Race count">
@@ -116,7 +116,7 @@ export function CalendarRules({
           <div className="rounded-lg border border-hairline/80 bg-base/50 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <span className="font-tel text-xs font-semibold uppercase tracking-wider text-mute">Max consecutive races</span>
+                <span className="font-tel text-xs font-semibold text-mute">Max consecutive races</span>
                 <p className="text-xs text-mute mt-0.5">Allowed range: {MIN_STREAK}–{MAX_STREAK_LIMIT} weekends</p>
               </div>
               <div className="flex items-center gap-1.5" role="group" aria-label="Maximum consecutive races">

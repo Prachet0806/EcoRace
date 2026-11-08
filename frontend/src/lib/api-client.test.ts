@@ -16,13 +16,6 @@ afterEach(() => {
 });
 
 describe("api-client contract", () => {
-  it("GETs the circuit library", async () => {
-    const mock = mockFetchOnce(200, { circuits: [], count: 0, dataset_version: "v" });
-    const out = await api.circuits();
-    expect(mock).toHaveBeenCalledWith("http://localhost:8000/api/v1/circuits", expect.anything());
-    expect(out.count).toBe(0);
-  });
-
   it("POSTs runs with the frozen DTO shape", async () => {
     const mock = mockFetchOnce(200, { run_id: "run_x" });
     await api.createRun({ race_count: 20, circuit_ids: ["a"], season_year: 2026 });

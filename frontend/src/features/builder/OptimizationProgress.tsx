@@ -64,7 +64,7 @@ export function OptimizationProgress({ phase, elapsedSeconds }: Props) {
     >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline/60 pb-4">
         <div>
-          <span className="font-tel text-xs font-semibold uppercase tracking-wider text-mute">Optimizing your calendar</span>
+          <span className="font-tel text-xs font-semibold text-mute">Optimizing your calendar</span>
           <h2 className="font-display text-2xl font-medium text-ink mt-1">Finding your best route</h2>
         </div>
         <span className="rounded-md border border-giallo/30 bg-giallo/15 px-3 py-1 font-tel text-xs font-medium text-giallo">
@@ -99,7 +99,7 @@ export function OptimizationProgress({ phase, elapsedSeconds }: Props) {
                   {isDone ? (
                     <span aria-hidden="true" className="font-tel text-pass text-xs font-bold">✓</span>
                   ) : isActive ? (
-                    <span aria-hidden="true" className="inline-block h-2 w-2 rounded-full bg-rosso animate-pulse" />
+                    <span aria-hidden="true" className="inline-block h-2 w-2 rounded-full bg-rosso" />
                   ) : (
                     <span aria-hidden="true" className="inline-block h-2 w-2 rounded-full bg-mute/40" />
                   )}

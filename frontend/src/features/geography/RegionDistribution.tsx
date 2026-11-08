@@ -19,7 +19,7 @@ export function RegionDistribution({ selected }: Props) {
     <section aria-label="Geographic mix" className="rounded-xl border border-hairline bg-card p-5">
       <div className="mb-3 flex items-baseline justify-between">
         <div>
-          <span className="font-tel text-xs font-semibold uppercase tracking-wider text-mute">Regional distribution</span>
+          <span className="font-tel text-xs font-semibold text-mute">Regional distribution</span>
           <h3 className="font-display text-base font-medium text-ink mt-0.5">Distribution by continent</h3>
         </div>
         <span className="rounded-md border border-hairline bg-lift px-2.5 py-1 font-tel text-xs text-mute">
@@ -34,17 +34,6 @@ export function RegionDistribution({ selected }: Props) {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            {rows.map((r) => (
-              <div key={r.region} className="rounded-lg border border-hairline/80 bg-base/50 p-2.5">
-                <span className="font-tel text-[11px] text-mute block uppercase tracking-wider">{r.region}</span>
-                <div className="mt-1 flex items-baseline gap-1.5">
-                  <span className="font-tel text-xl font-medium text-ink">{r.count}</span>
-                  <span className="text-[11px] text-mute">circuit{r.count === 1 ? "" : "s"}</span>
-                </div>
-              </div>
-            ))}
-          </div>
           <ul className="space-y-1.5 border-t border-hairline/60 pt-3">
             {rows.map((r, i) => (
               <li key={r.region} className="flex items-center gap-2 text-xs">

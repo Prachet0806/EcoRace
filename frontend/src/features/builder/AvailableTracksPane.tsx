@@ -48,7 +48,7 @@ export function AvailableTracksPane({ circuits, seasonYear, locked, onToggle }: 
             type="button"
             onClick={() => setRegion(r)}
             aria-pressed={region === r}
-            className={`min-h-8 rounded-md border px-2 font-tel text-xs transition-colors ${
+            className={`min-h-10 rounded-md border px-3 font-tel text-xs transition-colors ${
               region === r
                 ? "border-hairline bg-lift text-ink"
                 : "border-hairline text-mute hover:bg-lift hover:text-ink"

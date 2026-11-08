@@ -34,7 +34,7 @@ export function CalendarSourceSelector({ source, officialCount, selectedCount, o
     <section aria-label="Calendar source" className="rounded-xl border border-hairline bg-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div>
-          <h2 className="font-display text-base font-medium">Choose your calendar source</h2>
+          <h2 className="font-display text-base font-medium text-ink">Choose your calendar source</h2>
           <p className="text-xs text-mute mt-0.5">
             Switching modes defines how your circuits and race count are configured.
           </p>
@@ -52,7 +52,7 @@ export function CalendarSourceSelector({ source, officialCount, selectedCount, o
           type="button"
           onClick={() => handleSelect("custom")}
           aria-pressed={source === "custom"}
-          className={`relative rounded-xl border p-4 text-left transition-all ${
+          className={`relative rounded-xl border p-4 text-left transition-colors ${
             source === "custom"
               ? "border-rosso bg-lift/80 shadow-sm"
               : "border-hairline bg-card hover:bg-lift/40"
@@ -87,7 +87,7 @@ export function CalendarSourceSelector({ source, officialCount, selectedCount, o
           type="button"
           onClick={() => handleSelect("official-2026-venues")}
           aria-pressed={source === "official-2026-venues"}
-          className={`relative rounded-xl border p-4 text-left transition-all ${
+          className={`relative rounded-xl border p-4 text-left transition-colors ${
             source === "official-2026-venues"
               ? "border-rosso bg-lift/80 shadow-sm"
               : "border-hairline bg-card hover:bg-lift/40"
