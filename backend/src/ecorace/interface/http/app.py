@@ -5,7 +5,9 @@ Config (env):
   ECORACE_CORS_ALLOW_LAN: auto-allow this machine's private-IPv4 origins on
     ports 3000/3100 (default 1; set 0 to disable). Covers phone/LAN testing
     without hand-maintaining IPs.
-  SOLVER_TIMEOUT_SECONDS: total sync budget per run (default 30; split across seeds)
+  SOLVER_TIMEOUT_SECONDS: total sync budget per run (default 30; one seed gets remaining time)
+  SOLVER_CP_SAT_PRESOLVE: first attempt presolve (default 1; set 0 for comparison)
+  SOLVER_DIAGNOSTICS: bounded CP-SAT progress log (default 0)
   ECORACE_DATA_DIR: override reference-data directory
   LOG_LEVEL: logging level (default INFO)
   SOLVER_CIRCUIT_BREAKER_THRESHOLD: consecutive failures before open (default 5)
@@ -105,6 +107,12 @@ def create_app() -> FastAPI:
     )
 
     app.state.solver_budget_s = float(os.environ.get("SOLVER_TIMEOUT_SECONDS", "30"))
+    app.state.solver_first_attempt_presolve = os.environ.get(
+        "SOLVER_CP_SAT_PRESOLVE", "1"
+    ) == "1"
+    app.state.solver_diagnostics_enabled = os.environ.get(
+        "SOLVER_DIAGNOSTICS", "0"
+    ) == "1"
     app.state.solver_slots = threading.BoundedSemaphore(
         max(1, int(os.environ.get("SOLVER_MAX_CONCURRENT", "1")))
     )

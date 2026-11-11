@@ -129,6 +129,8 @@ cd frontend && npm test && npm run typecheck && npm run build && npx playwright 
 | Var | Where | Default | Notes |
 |---|---|---|---|
 | `SOLVER_TIMEOUT_SECONDS` | API | `30` | Total sync budget per run. Leave a margin below the platform request timeout. |
+| `SOLVER_CP_SAT_PRESOLVE` | API | `1` | Set to `0` for a controlled presolve-off comparison. |
+| `SOLVER_DIAGNOSTICS` | API | `0` | Set to `1` to emit bounded CP-SAT progress logs. |
 | `SOLVER_MAX_CONCURRENT` | API | `1` | Simultaneous solves per process. Keep at 1 for the pilot. |
 | `SOLVER_CIRCUIT_BREAKER_THRESHOLD` | API | `5` | Consecutive solver failures before 503. |
 | `SOLVER_CIRCUIT_BREAKER_COOLDOWN_S` | API | `60` | Cooldown before half-open. |
@@ -141,6 +143,8 @@ cd frontend && npm test && npm run typecheck && npm run build && npx playwright 
 | `RATE_LIMIT_WEEKENDS` | API | `60/minute` | Season weekends limit. |
 | `LOG_LEVEL` | API | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
 | `NEXT_PUBLIC_ECORACE_API_URL` | web | `http://localhost:8000` | Build-time. |
+
+For a repeatable 24-race presolve comparison, see [Solver diagnostics](SOLVER_DIAGNOSTICS.md).
 
 ## Session-history contract
 

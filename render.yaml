@@ -24,6 +24,10 @@ services:
         value: "0"
       - key: SOLVER_TIMEOUT_SECONDS
         value: "45"
+      - key: SOLVER_CP_SAT_PRESOLVE
+        value: "1"
+      - key: SOLVER_DIAGNOSTICS
+        value: "0"
       - key: SOLVER_MAX_CONCURRENT
         value: "1"
       - key: SOLVER_CIRCUIT_BREAKER_THRESHOLD

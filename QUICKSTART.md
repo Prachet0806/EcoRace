@@ -34,7 +34,7 @@ Invoke-RestMethod http://localhost:8000/api/v1/health
 Optional env (defaults shown):
 
 ```powershell
-$env:SOLVER_TIMEOUT_SECONDS = '30'        # total sync budget per run, split across seeds
+$env:SOLVER_TIMEOUT_SECONDS = '30'        # total sync budget per run, one seed gets remaining time
 $env:ECORACE_CORS_ORIGINS = 'http://localhost:3000'
 $env:ECORACE_DATA_DIR = 'C:\Users\prach\Documents\EcoRace\data'
 ```

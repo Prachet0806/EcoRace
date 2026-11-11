@@ -1,0 +1,31 @@
+{
+    "budget_s":  45,
+    "seed":  0,
+    "race_count":  24,
+    "circuit_ids":  [
+                        "albert_park",
+                        "imola",
+                        "monza",
+                        "mexico_city",
+                        "algarve",
+                        "interlagos",
+                        "bahrain",
+                        "baku",
+                        "buriram",
+                        "catalunya",
+                        "monaco",
+                        "magny_cours",
+                        "spa",
+                        "montreal",
+                        "austin",
+                        "paul_ricard",
+                        "zandvoort",
+                        "jerez",
+                        "estoril",
+                        "dubai_autodrome",
+                        "fuji",
+                        "hockenheim",
+                        "hungaroring",
+                        "igora_drive"
+                    ]
+}

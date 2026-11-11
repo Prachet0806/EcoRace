@@ -10,7 +10,10 @@ not vice versa.
 
 from __future__ import annotations
 
+import logging
+import re
 import time
+import uuid
 
 from ortools.sat.python import cp_model
 
@@ -31,6 +34,54 @@ from ecorace.optimization.model import (
     build_distance_matrix,
 )
 
+_LOGGER = logging.getLogger("ecorace.solver")
+_DIAGNOSTIC_LOG_LIMIT = 64_000
+
+
+class _SolutionTiming(cp_model.CpSolverSolutionCallback):
+    """Collect only solution timing and objective, without copying calendars."""
+
+    def __init__(self, started: float) -> None:
+        super().__init__()
+        self.started = started
+        self.count = 0
+        self.first_ms: int | None = None
+        self.first_km: float | None = None
+        self.last_km: float | None = None
+
+    def on_solution_callback(self) -> None:
+        self.count += 1
+        objective_km = self.objective_value / 1000.0
+        if self.first_ms is None:
+            self.first_ms = int((time.perf_counter() - self.started) * 1000)
+            self.first_km = objective_km
+        self.last_km = objective_km
+
+
+def _progress_timing(log_text: str) -> dict[str, int | bool | None]:
+    """Estimate presolve duration from the pinned OR-Tools progress log."""
+    presolve = re.search(r"Starting presolve at ([0-9.]+)s", log_text)
+    search = re.search(r"Starting search at ([0-9.]+)s", log_text)
+    presolve_s = float(presolve.group(1)) if presolve else None
+    search_s = float(search.group(1)) if search else None
+    return {
+        "search_started": search_s is not None,
+        "presearch_ms": int(search_s * 1000) if search_s is not None else None,
+        "presolve_estimate_ms": (
+            int((search_s - presolve_s) * 1000)
+            if search_s is not None and presolve_s is not None and search_s >= presolve_s
+            else None
+        ),
+    }
+
+
+def _status_without_solution(status) -> SolveStatus:
+    if status == cp_model.INFEASIBLE:
+        return SolveStatus.INFEASIBLE
+    if status == cp_model.MODEL_INVALID:
+        return SolveStatus.SOLVER_FAILURE
+    return SolveStatus.SOLVER_TIMEOUT
+
 
 class ORToolsSolver:
     name = "ortools"
@@ -42,6 +93,8 @@ class ORToolsSolver:
         hint_calendar: Calendar | None = None,
     ) -> tuple[Calendar | None, SolverMetadata]:
         t0 = time.perf_counter()
+        cpu0 = time.process_time()
+        trace_id = uuid.uuid4().hex[:12]
         ids = list(problem.scenario.circuit_ids)
         n = len(ids)
         weekends = list(problem.weekends)
@@ -121,6 +174,7 @@ class ORToolsSolver:
         # hints are infeasible and poison the search (measured P1).
         # Completeness matters: monthly membership bools must be hinted too —
         # partial hints stall first solutions (measured V1.1).
+        hint_supplied = False
         if config.use_hint and hint_calendar is not None:
             cal_order = [
                 hint_calendar.assignment[x.id]
@@ -128,6 +182,7 @@ class ORToolsSolver:
                 if x.id in hint_calendar.assignment
             ]
             if sorted(cal_order) == sorted(ids):
+                hint_supplied = True
                 hint_twi = [
                     windex_of[x.id]
                     for x in weekends
@@ -140,6 +195,20 @@ class ORToolsSolver:
                 for (k, month), b in month_bool_vars.items():
                     model.AddHint(b, month == hint_months[k])
 
+        built_at = time.perf_counter()
+        built_cpu = time.process_time()
+        proto = model.Proto()
+        diagnostics: dict = {
+            "trace_id": trace_id,
+            "presolve": config.presolve,
+            "num_workers": config.num_workers,
+            "hint_supplied": hint_supplied,
+            "weather_feasible_pairs": len(feasible_set),
+            "model_variables": len(proto.variables),
+            "model_constraints": len(proto.constraints),
+            "model_build_ms": int((built_at - t0) * 1000),
+            "model_build_cpu_ms": int((built_cpu - cpu0) * 1000),
+        }
         solver = cp_model.CpSolver()
         remaining = (
             config.deadline_monotonic - time.monotonic()
@@ -147,6 +216,7 @@ class ORToolsSolver:
             else config.time_limit_s
         )
         if remaining <= 0:
+            diagnostics.update({"raw_status": "NOT_STARTED", "solver_limit_s": 0.0})
             return None, SolverMetadata(
                 solver_name=self.name,
                 solver_version=_ORTOOLS_VERSION,
@@ -155,10 +225,10 @@ class ORToolsSolver:
                 time_limit_s=0.0,
                 status=SolveStatus.SOLVER_TIMEOUT,
                 data_version=problem.data_version,
+                diagnostics=diagnostics,
             )
-        solver.parameters.max_time_in_seconds = min(
-            max(config.time_limit_s, 0.0), remaining
-        )
+        solver_limit_s = min(max(config.time_limit_s, 0.0), remaining)
+        solver.parameters.max_time_in_seconds = solver_limit_s
         solver.parameters.random_seed = config.seed
         solver.parameters.num_search_workers = config.num_workers
         # Presolve OFF by default: Probe can expand table/element encodings
@@ -166,8 +236,64 @@ class ORToolsSolver:
         # locks a provided hint almost instantly but improves weakly — the
         # pipeline portfolios both (first seed ON for safety, rest OFF).
         solver.parameters.cp_model_presolve = config.presolve
-        status = solver.Solve(model)
+        diagnostic_parts: list[str] = []
+        diagnostic_chars = 0
+        progress_markers: list[str] = []
+        progress_tail = ""
+        if config.diagnostics_enabled:
+            solver.parameters.log_search_progress = True
+            solver.parameters.log_to_stdout = False
+
+            def capture_log(message: str) -> None:
+                nonlocal diagnostic_chars, progress_tail
+                progress_tail = (progress_tail + message)[-512:]
+                for phrase in ("Starting presolve", "Starting search"):
+                    match = re.search(rf"{phrase} at ([0-9.]+)s", progress_tail)
+                    if match and not any(phrase in marker for marker in progress_markers):
+                        progress_markers.append(match.group(0))
+                if diagnostic_chars < _DIAGNOSTIC_LOG_LIMIT:
+                    part = message[: _DIAGNOSTIC_LOG_LIMIT - diagnostic_chars]
+                    diagnostic_parts.append(part)
+                    diagnostic_chars += len(part)
+
+            solver.log_callback = capture_log
+
+        solve_started = time.perf_counter()
+        solve_cpu = time.process_time()
+        solutions = _SolutionTiming(solve_started)
+        status = solver.Solve(model, solutions)
         runtime_ms = int((time.perf_counter() - t0) * 1000)
+        log_text = "".join(diagnostic_parts)
+        raw_status = solver.StatusName(status)
+        diagnostics.update(
+            {
+                "raw_status": raw_status,
+                "solver_limit_s": solver_limit_s,
+                "solver_wall_ms": int(solver.WallTime() * 1000),
+                "solver_user_ms": int(solver.UserTime() * 1000),
+                "solve_cpu_ms": int((time.process_time() - solve_cpu) * 1000),
+                "solution_count": solutions.count,
+                "first_solution_ms": solutions.first_ms,
+                "first_solution_km": solutions.first_km,
+                "last_solution_km": solutions.last_km,
+                "branches": solver.NumBranches(),
+                "conflicts": solver.NumConflicts(),
+                "search_started": None,
+                "presearch_ms": None,
+                "presolve_estimate_ms": None,
+            }
+        )
+        if config.diagnostics_enabled:
+            diagnostics.update(_progress_timing("\n".join(progress_markers)))
+            diagnostics["diagnostic_log_truncated"] = diagnostic_chars >= _DIAGNOSTIC_LOG_LIMIT
+            for offset in range(0, len(log_text), 4096):
+                _LOGGER.info(
+                    "CP-SAT trace_id=%s seed=%s raw_status=%s presolve=%s log_part=%s %s",
+                    trace_id, config.seed, raw_status, config.presolve,
+                    offset // 4096, log_text[offset : offset + 4096],
+                )
+        if status == cp_model.MODEL_INVALID:
+            diagnostics["solution_info"] = solver.SolutionInfo()[:500]
 
         def meta(st: SolveStatus, obj_km: float | None, proven: bool) -> SolverMetadata:
             return SolverMetadata(
@@ -175,11 +301,12 @@ class ORToolsSolver:
                 solver_version=_ORTOOLS_VERSION,
                 seed=config.seed,
                 runtime_ms=runtime_ms,
-                time_limit_s=config.time_limit_s,
+                time_limit_s=solver_limit_s,
                 status=st,
                 objective_km=obj_km,
                 optimality_proven=proven,
                 data_version=problem.data_version,
+                diagnostics=diagnostics,
             )
 
         if status == cp_model.OPTIMAL:
@@ -192,9 +319,7 @@ class ORToolsSolver:
             return cal, meta(
                 SolveStatus.FEASIBLE_TIMEOUT, solver.ObjectiveValue() / 1000.0, False
             )
-        if status == cp_model.INFEASIBLE:
-            return None, meta(SolveStatus.INFEASIBLE, None, False)
-        return None, meta(SolveStatus.SOLVER_TIMEOUT, None, False)
+        return None, meta(_status_without_solution(status), None, False)
 
     @staticmethod
     def _extract(solver: cp_model.CpSolver, s, t, ids: list[str], weekends) -> Calendar:

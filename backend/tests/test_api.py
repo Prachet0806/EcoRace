@@ -175,7 +175,17 @@ def test_run_happy_path_contract():
     assert body["data_version"] == "fia-grade1-2026-03-31+f1-2020-2026"
     assert body["provenance"]["weather_synthetic"] is True
     assert body["provenance"]["weather_sha256"]
-    assert body["provenance"]["seed_schedule"] == [0, 1, 2]
+    assert body["provenance"]["seed_schedule"] == [0]
+    assert len(body["provenance"]["attempts"]) == 1
+    assert body["provenance"]["attempts"][0]["seed"] == 0
+    assert body["provenance"]["attempts"][0]["time_limit_s"] <= 3.0
+    attempt = body["provenance"]["attempts"][0]
+    assert attempt["raw_status"] in {"OPTIMAL", "FEASIBLE", "INFEASIBLE", "UNKNOWN", "MODEL_INVALID"}
+    assert attempt["model_build_ms"] >= 0
+    assert attempt["solver_limit_s"] <= 3.0
+    assert attempt["first_solution_ms"] is None or attempt["first_solution_ms"] >= 0
+    assert body["provenance"]["timing_ms"]["heuristic"] >= 0
+    assert body["provenance"]["total_runtime_ms"] >= attempt["runtime_ms"]
     # Route geometry sanity: segment endpoints match race order.
     for seg, a, b in zip(body["segments"], cal["races"], cal["races"][1:]):
         assert (seg["from_circuit_id"], seg["to_circuit_id"]) == (

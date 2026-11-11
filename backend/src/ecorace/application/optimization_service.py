@@ -26,8 +26,8 @@ from ecorace.domain.calendar.scenario import (
 from ecorace.infrastructure import data_loader
 from ecorace.optimization.model import OptimizationResult, SolverConfig, SolveStatus
 from ecorace.optimization.pipeline import InfeasibleProblem, build_problem, optimize
-from ecorace.optimization.validator import SolutionValidator
 from ecorace.optimization.quality import route_quality
+from ecorace.optimization.validator import SolutionValidator
 
 _DOMAIN_ERRORS = (
     InsufficientCircuits,
@@ -104,8 +104,11 @@ def run_optimization(
     summer_break_start: int | None = None,
     summer_break_end: int | None = None,
     pin_end_to_dec_week1: bool = False,
+    first_attempt_presolve: bool = True,
+    diagnostics_enabled: bool = False,
 ) -> dict:
     started = time.monotonic()
+    started_cpu = time.process_time()
     deadline = started + total_budget_s
     circuits, circuits_tag = data_loader.circuits_bundle()
     weather = data_loader.weather_policy()
@@ -113,6 +116,7 @@ def run_optimization(
         weekends = data_loader.season(season_year)
     except ValueError as e:
         raise AppError(code="INVALID_HORIZON", message=str(e), status_code=422) from e
+    data_loaded = time.monotonic()
     scenario = Scenario(
         race_count=race_count,
         circuit_ids=tuple(circuit_ids),
@@ -134,17 +138,22 @@ def run_optimization(
         raise AppError(
             code="SCENARIO_INFEASIBLE", message=str(e), status_code=422
         ) from e
+    problem_built = time.monotonic()
 
-    seeds = tuple(seed + i for i in range(3))
+    # Give one CP-SAT attempt the remaining request budget after the heuristic.
+    seeds = (seed,)
     result = optimize(
         problem,
         SolverConfig(
-            time_limit_s=total_budget_s / 3.0,
+            time_limit_s=total_budget_s,
             seed=seed,
             seeds=seeds,
             deadline_monotonic=deadline,
+            first_attempt_presolve=first_attempt_presolve,
+            diagnostics_enabled=diagnostics_enabled,
         ),
     )
+    optimized = time.monotonic()
     run_result = present_result(
         result,
         scenario,
@@ -153,10 +162,18 @@ def run_optimization(
         circuits_tag,
         total_budget_s,
         seeds,
-        int((time.monotonic() - started) * 1000),
     )
     if scenario_id:
         run_result["scenario_id"] = scenario_id
+    finished = time.monotonic()
+    run_result["provenance"]["timing_ms"] = {
+        "data_load": int((data_loaded - started) * 1000),
+        "precheck": int((problem_built - data_loaded) * 1000),
+        **result.diagnostics.get("timing_ms", {}),
+        "presentation": int((finished - optimized) * 1000),
+        "service_cpu": int((time.process_time() - started_cpu) * 1000),
+    }
+    run_result["provenance"]["total_runtime_ms"] = int((finished - started) * 1000)
     return run_result
 
 
@@ -168,7 +185,6 @@ def present_result(
     circuits_tag: str,
     total_budget_s: float,
     seeds: tuple[int, ...],
-    total_runtime_ms: int,
 ) -> dict:
     circuits, _ = data_loader.circuits_bundle()
     if result.status == SolveStatus.INFEASIBLE:
@@ -371,6 +387,5 @@ def present_result(
             "seed_schedule": list(seeds),
             "attempts": result.diagnostics.get("attempts", []),
             "quality_selection": result.diagnostics.get("quality_selection"),
-            "total_runtime_ms": total_runtime_ms,
         },
     }

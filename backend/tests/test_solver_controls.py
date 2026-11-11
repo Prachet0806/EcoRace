@@ -10,6 +10,32 @@ IDS = [c["id"] for c in data_loader.circuit_list_sorted()]
 PAYLOAD = {"race_count": 20, "circuit_ids": IDS[:20], "budget_s": 1.0}
 
 
+def test_solver_diagnostic_settings_are_explicit(monkeypatch):
+    monkeypatch.setenv("SOLVER_CP_SAT_PRESOLVE", "0")
+    monkeypatch.setenv("SOLVER_DIAGNOSTICS", "1")
+    app = create_app()
+    assert app.state.solver_first_attempt_presolve is False
+    assert app.state.solver_diagnostics_enabled is True
+
+
+def test_diagnostic_run_uses_requested_presolve_mode(monkeypatch):
+    monkeypatch.setenv("SOLVER_CP_SAT_PRESOLVE", "0")
+    monkeypatch.setenv("SOLVER_DIAGNOSTICS", "1")
+    app = create_app()
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/optimization/runs",
+            json={"race_count": 20, "circuit_ids": IDS[:20], "budget_s": 3.0},
+        )
+    assert response.status_code == 200
+    attempt = response.json()["provenance"]["attempts"][0]
+    assert attempt["presolve"] is False
+    assert attempt["trace_id"]
+    assert attempt["search_started"] is True
+    assert attempt["presearch_ms"] is not None
+    assert isinstance(attempt["diagnostic_log_truncated"], bool)
+
+
 def test_busy_solver_returns_promptly_without_creating_scenario():
     app = create_app()
     app.state.solver_slots.acquire()

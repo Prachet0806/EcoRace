@@ -90,6 +90,8 @@ def create_run(
                 summer_break_start=body.summer_break_start,
                 summer_break_end=body.summer_break_end,
                 pin_end_to_dec_week1=body.pin_end_to_dec_week1,
+                first_attempt_presolve=request.app.state.solver_first_attempt_presolve,
+                diagnostics_enabled=request.app.state.solver_diagnostics_enabled,
             )
         except svc.AppError as exc:
             if exc.code in ("SOLVER_FAILURE", "SOLVER_TIMEOUT"):

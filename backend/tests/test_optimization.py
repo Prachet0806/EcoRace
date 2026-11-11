@@ -1,7 +1,7 @@
 """P1 gate: solver correctness, determinism, timeout typing, validator independence."""
 
-import time
 import random
+import time
 from pathlib import Path
 
 from ecorace.domain.calendar.calendar import Calendar
@@ -22,9 +22,15 @@ from ecorace.optimization.model import (
     build_distance_matrix,
     order_distance_km,
 )
+from ecorace.optimization.ortools_solver import (
+    _progress_timing,
+    _SolutionTiming,
+    _status_without_solution,
+)
 from ecorace.optimization.pipeline import build_problem, optimize
 from ecorace.optimization.quality import route_quality
 from ecorace.optimization.validator import SolutionValidator
+from ortools.sat.python import cp_model
 
 ROOT = Path(__file__).resolve().parents[2]
 CIRCUITS = load_circuits(ROOT / "data" / "circuits.json")
@@ -127,6 +133,34 @@ def test_timeout_is_typed_never_fake():
             )
             == ()
         )
+
+
+def test_cp_sat_diagnostics_distinguish_invalid_model_and_presolve():
+    assert _status_without_solution(cp_model.MODEL_INVALID) == SolveStatus.SOLVER_FAILURE
+    assert _status_without_solution(cp_model.UNKNOWN) == SolveStatus.SOLVER_TIMEOUT
+    assert _progress_timing("Starting presolve at 0.02s\nStarting search at 1.25s") == {
+        "search_started": True,
+        "presearch_ms": 1250,
+        "presolve_estimate_ms": 1230,
+    }
+    assert _progress_timing("Starting presolve at 0.02s") == {
+        "search_started": False,
+        "presearch_ms": None,
+        "presolve_estimate_ms": None,
+    }
+
+
+def test_solution_timing_callback_observes_first_incumbent():
+    model = cp_model.CpModel()
+    choice = model.NewBoolVar("choice")
+    model.Minimize(choice)
+    solver = cp_model.CpSolver()
+    started = time.perf_counter()
+    callback = _SolutionTiming(started)
+    assert solver.Solve(model, callback) == cp_model.OPTIMAL
+    assert callback.count >= 1
+    assert callback.first_ms is not None and callback.first_ms >= 0
+    assert callback.first_km == 0.0
 
 
 def test_expired_deadline_does_not_start_cp_sat(monkeypatch):
