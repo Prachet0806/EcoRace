@@ -4,7 +4,7 @@ Get the API + builder running locally in ~5 minutes.
 
 ## 1. Prerequisites
 
-- **Python 3.11.9** (`python --version`)
+- **Python 3.12.10** (`python --version`)
 - **Node 22** (`node --version`), npm 11
 - Ports free: **8000** (API), **3000** (web)
 
@@ -14,7 +14,8 @@ Get the API + builder running locally in ~5 minutes.
 cd C:\Users\prach\Documents\EcoRace
 
 # Install (once)
-pip install -e ".[test]"
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[test]"
 
 # Run tests (once, ~60s — includes solver runs)
 python -m pytest backend/tests/ -q

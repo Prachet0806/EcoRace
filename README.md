@@ -104,5 +104,5 @@ Historical phase-gate reports describe earlier snapshots; this README and
 
 ## Version pins
 
-Python 3.11.9 · Node 22 · Next 16.3.5 · FastAPI 0.128.2 · OR-Tools 9.15.6755 ·
+Python 3.12.10 · Node 22 · Next 16.3.5 · FastAPI 0.128.2 · OR-Tools 9.15.6755 ·
 zustand 5.0.15 · maplibre-gl 6.10.0. Full list: `docs/VERSIONS.md`.

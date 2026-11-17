@@ -1,6 +1,6 @@
 """Compare validated heuristic and CP-SAT calendars on representative venue sets.
 
-Run from the repository root with Python 3.11:
+Run from the repository root with Python 3.12.10:
     python backend/tests/bench_quality.py --budget 5
 
 Prints JSON only. No benchmark result is written into the source tree.

@@ -1,5 +1,5 @@
 // ADR-FE-002: single typed FastAPI client. Components must not call fetch() directly.
-import type { ApiError, RunPayload, SeasonSchedule } from "./types";
+import type { ApiError, RunPayload } from "./types";
 import { useToastStore } from "./useToastStore";
 
 const BASE_URL = process.env.NEXT_PUBLIC_ECORACE_API_URL ?? "http://localhost:8000";
@@ -44,7 +44,6 @@ function notifyError(error: EcoRaceApiError) {
 export const api = {
   baseUrl: BASE_URL,
   health: () => request<{ status: string; dataset_version: string }>("/api/v1/health"),
-  seasonWeekends: (year: number) => request<SeasonSchedule>(`/api/v1/seasons/${year}/weekends`),
   createRun: (body: {
     race_count: number;
     circuit_ids: string[];

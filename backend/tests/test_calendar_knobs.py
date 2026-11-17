@@ -48,11 +48,13 @@ def test_streak_limit_parameterized():
 def test_scenario_knob_validation():
     base = {"race_count": 20, "circuit_ids": tuple(IDS[:20]), "season_year": 2026}
     validate_scenario(Scenario(**base, max_consecutive=2), set(CIRCUITS))
-    validate_scenario(Scenario(**base, max_consecutive=7), set(CIRCUITS))
+    validate_scenario(Scenario(**base, max_consecutive=4), set(CIRCUITS))
     with pytest.raises(InvalidStreakLimit):
         validate_scenario(Scenario(**base, max_consecutive=1), set(CIRCUITS))
     with pytest.raises(InvalidStreakLimit):
         validate_scenario(Scenario(**base, max_consecutive=8), set(CIRCUITS))
+    with pytest.raises(InvalidStreakLimit):
+        validate_scenario(Scenario(**base, max_consecutive=5), set(CIRCUITS))
     with pytest.raises(InvalidSummerBreak):
         validate_scenario(Scenario(**base, summer_break_start=19), set(CIRCUITS))
     with pytest.raises(InvalidSummerBreak):

@@ -10,7 +10,7 @@ import type { OptimizeStatus, RunPayload } from "./types";
 export const MIN_RACES = 20;
 export const MAX_RACES = 24;
 export const MIN_STREAK = 2;
-export const MAX_STREAK_LIMIT = 7;
+export const MAX_STREAK_LIMIT = 4;
 export const DEFAULT_STREAK_LIMIT = 3;
 export const MAX_WEEK_INDEX = 39;
 

@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.12.10-slim
 
 # Stateless pilot: no database, no persistent volume.
 # Reference data (circuits, seasons, weather) is baked in at /app/data.

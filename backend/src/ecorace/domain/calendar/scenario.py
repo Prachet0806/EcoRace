@@ -47,9 +47,9 @@ class Scenario:
 def validate_scenario(scenario: Scenario, known_circuit_ids: set[str]) -> Scenario:
     if not 20 <= scenario.race_count <= 24:
         raise InvalidRaceCount(f"race_count must be 20-24, got {scenario.race_count}")
-    if not 2 <= scenario.max_consecutive <= 7:
+    if not 2 <= scenario.max_consecutive <= 4:
         raise InvalidStreakLimit(
-            f"max_consecutive must be 2-7, got {scenario.max_consecutive}"
+            f"max_consecutive must be 2-4, got {scenario.max_consecutive}"
         )
     brk = (scenario.summer_break_start, scenario.summer_break_end)
     if (brk[0] is None) != (brk[1] is None):
