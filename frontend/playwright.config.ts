@@ -1,6 +1,4 @@
 import { defineConfig } from "@playwright/test";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 
 const apiPort = process.env.ECORACE_E2E_API_PORT ?? "8000";
 
@@ -19,7 +17,6 @@ export default defineConfig({
         PYTHONPATH: "backend/src",
         SOLVER_TIMEOUT_SECONDS: "9",
         ECORACE_CORS_ORIGINS: "http://localhost:3100",
-        ECORACE_DB_PATH: join(tmpdir(), `ecorace-e2e-${process.pid}.db`),
       },
       url: `http://localhost:${apiPort}/api/v1/health`,
       timeout: 60_000,

@@ -34,7 +34,7 @@ backend/src/ecorace/   FastAPI + domain + optimization core
   optimization/         solver pipeline: result = optimize(problem)
   application/          scenario/run orchestration (no HTTP/SQL)
   interface/http/       routes, DTOs, error envelope
-  infrastructure/       JSON reference-data loader and SQLite storage
+  infrastructure/       JSON reference-data loader
 backend/tests/          pytest suite and benchmark harnesses
 frontend/src/           Next.js (App Router) + Tailwind + zustand + MapLibre
   app/                   builder page (`page.tsx` at root)
@@ -94,7 +94,7 @@ See **[QUICKSTART.md](QUICKSTART.md)** — backend + frontend up in ~5 minutes.
   incumbents are marked `feasible_timeout`, never presented as optimal.
 - Errors use `{error: {code, message, details}}` with stable codes
   (`INSUFFICIENT_CIRCUITS`, `SCENARIO_INFEASIBLE`, `SOLVER_TIMEOUT`, …).
-- **Stateless backend architecture**: Optimization is synchronous (`POST /api/v1/optimization/runs`) and returns the complete result payload directly. No persistent server-side database is required or mounted; runs are kept in client session storage and in-memory React state for comparison across the active tab. Server-side lookup by ID returns 404 by design.
+- **Stateless backend architecture**: Optimization is synchronous (`POST /api/v1/optimization/runs`) and returns the complete result payload directly. There is no server-side result history or API idempotency; runs are kept in browser session storage and React state for the active tab. Existing results from prior database-backed deployments are not migrated or available through this API. Download result JSON for durable retention.
 - The API enforces process-local in-memory sliding-window rate limiting and an admission-controlled solver concurrency pool with circuit-breaker protection.
 - A baseline that violates hard rules is shown as a reference only, with no
   savings claim. Run provenance records scenario choices and weather policy.

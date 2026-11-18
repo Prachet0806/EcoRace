@@ -30,12 +30,12 @@ def test_health():
     body = r.json()
     assert body["status"] == "ok"
     assert "dataset_version" in body
-    # No database key — health is stateless.
+    # Health contains operational status, not persistence status.
     assert "database" not in body
 
 
 def test_health_liveness_probe():
-    """Root /health works without SQLite."""
+    """Root /health liveness probe is available."""
     r = client.get("/health")
     assert r.status_code == 200
     assert r.json()["status"] == "ok"
@@ -70,7 +70,7 @@ def test_circuits_expose_venue_provenance():
 
 
 # ---------------------------------------------------------------------------
-# Scenario (in-memory, no database writes)
+# Scenario (in-memory, no persistence writes)
 # ---------------------------------------------------------------------------
 
 
@@ -91,7 +91,7 @@ def test_create_scenario_ok():
     assert body["summer_break_start"] == 19
     assert body["summer_break_end"] == 21
     assert body["pin_end_to_dec_week1"] is True
-    # No database: validate the returned dict rather than a stored row.
+    # Validate the returned dict directly; no stored row exists.
 
 
 def test_scenario_error_codes():
@@ -352,8 +352,8 @@ def test_in_memory_rate_limiting_is_process_local_and_tracks_quota(monkeypatch):
     app = create_app()
     isolated = TestClient(app, client=client_address)
     assert isolated.get("/api/v1/health").status_code == 200
-    # Second request from the same client exhausts the per-minute limit.
-    limited = isolated.get("/api/v1/health")
+    # Both health routes share the same limit group.
+    limited = isolated.get("/health")
     assert limited.status_code == 429
     assert limited.json()["error"]["code"] == "RATE_LIMITED"
     assert int(limited.headers["Retry-After"]) >= 1
@@ -461,14 +461,12 @@ def test_circuit_breaker_recovers_after_cooldown(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Stateless startup: no database required
+# Stateless startup: no persistence configuration required
 # ---------------------------------------------------------------------------
 
 
-def test_app_starts_without_database_env(monkeypatch):
-    """Application factory must succeed even with no DB-related env vars."""
-    for key in ("ECORACE_DB_PATH", "ECORACE_DB_MOUNT", "ECORACE_REQUIRE_PERSISTENT_DB", "ECORACE_DB_BUSY_TIMEOUT_S"):
-        monkeypatch.delenv(key, raising=False)
+def test_app_starts_without_persistence_configuration():
+    """Application factory serves requests without persistence configuration."""
     # Must not raise.
     fresh_app = create_app()
     tc = TestClient(fresh_app)

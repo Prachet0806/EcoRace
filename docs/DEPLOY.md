@@ -49,7 +49,10 @@ docker run -p 8000:8000 \
 Notes:
 
 - Image bakes in `data/` (42 venues, horizons, weather-v1). New data = rebuild and redeploy.
-- OR-Tools needs ~512 MB RAM for 24-race solves; give the container ≥1 GB (2 GB recommended).
+- Resource needs must be measured on the target host for the selected solver
+  settings and workload. The checked-in Render blueprint uses the Free plan;
+  the prior local estimate of ~512 MB for a 24-race solve is not a hosted
+  benchmark and does not establish that this plan has enough memory.
 - **No persistent disk required.** The image creates no database directory.
 - Run one process, one Uvicorn worker, one solver slot. The semaphore and
   circuit breaker are process-local. Horizontal scaling requires a separate
@@ -58,6 +61,11 @@ Notes:
   weather, rebuild and redeploy the Docker image.
 - Request quotas are in-memory per process. A restart resets quotas. This is
   acceptable for the pilot.
+- The API does not deduplicate repeated optimization submissions. A client
+  retry after a lost response can start another solve; the frontend's request
+  ID is for tracing only, not an idempotency key.
+- Results from former database-backed deployments are not imported. Only
+  browser session data and downloaded result JSON remain available to users.
 - Weather is a synthetic demonstration fixture, not historical climate data or
   a forecast. The objective minimizes great-circle route distance, not carbon.
 

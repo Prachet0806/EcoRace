@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 export type OptimizationPhase =
   | "idle"
   | "preparing"
@@ -28,8 +26,8 @@ const STAGES = [
   },
   {
     id: "validating",
-    title: "3. Validating solution",
-    description: "The returned schedule will be checked against the constraints.",
+    title: "3. Verifying response",
+    description: "Confirming the response contains a usable run ID.",
   },
   {
     id: "complete",

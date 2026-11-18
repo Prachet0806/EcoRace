@@ -73,8 +73,10 @@ $body = @{ race_count = 20; circuit_ids = $ids; season_year = 2026; budget_s = 9
 $run = Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/v1/optimization/runs -Body $body -ContentType 'application/json'
 $run.metrics          # total vs baseline distance
 $run.calendar.races | Select-Object -First 3 race_id, weekend_id, circuit_name
-Invoke-RestMethod "http://localhost:8000/api/v1/optimization/runs/$($run.run_id)" | Select-Object run_id, status
 ```
+
+The POST response contains the complete result. The API has no result lookup or
+history endpoint; the browser keeps results in the current tab's session.
 
 Rules that will reject your request (exact-match MVP):
 
@@ -91,7 +93,7 @@ Rules that will reject your request (exact-match MVP):
 | Web shows "Could not load circuits" | API not on `:8000`, or set `NEXT_PUBLIC_ECORACE_API_URL` in `.env.local` + restart `npm run dev` |
 | Solve feels slow | expected: sync budget ≈ `SOLVER_TIMEOUT_SECONDS`; lower `budget_s` per request for faster, slightly worse routes. Calendar knobs (esp. monthly minimum) roughly triple first-solution time vs the bare model |
 | Status `feasible_timeout` | a validator-clean calendar was found, but optimality was not proven. A savings figure is shown only when the baseline meets the same constraints |
-| `RUN_NOT_FOUND` after API restart | check `ECORACE_DB_PATH` and whether its directory persists; the Render blueprint uses ephemeral storage |
+| A result is missing after closing the browser tab | Results are kept in session storage; download the result JSON to retain it |
 | `SOLVER_OVERLOADED` | wait for the `Retry-After` interval; concurrent solves are limited per process |
 | Port clash | `Get-NetTCPConnection -LocalPort 8000/3000` → stop the owner process |
 

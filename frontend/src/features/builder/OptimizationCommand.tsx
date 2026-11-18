@@ -29,7 +29,7 @@ export function OptimizationCommand({
 
   // Contextual readiness status line
   let statusText: string;
-  let statusTone: "ready" | "warn" | "error" | "running";
+  let statusTone: "ready" | "warn" | "running";
 
   if (running) {
     statusText = "Optimization is in progress";
@@ -111,8 +111,6 @@ export function OptimizationCommand({
           className={`font-tel text-xs font-medium ${
             statusTone === "ready"
               ? "text-pass"
-              : statusTone === "error"
-              ? "text-rosso-ink"
               : statusTone === "running"
               ? "text-giallo"
               : "text-mute"

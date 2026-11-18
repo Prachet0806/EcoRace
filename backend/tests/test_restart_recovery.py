@@ -31,7 +31,7 @@ def _free_port() -> int:
 
 
 def _start(port: int) -> subprocess.Popen:
-    """Start the API without any database configuration."""
+    """Start the API without persistence configuration."""
     env = os.environ.copy()
     env.update(
         {
@@ -40,15 +40,6 @@ def _start(port: int) -> subprocess.Popen:
             "RATE_LIMIT_RUNS": "1000/minute",
         }
     )
-    # Explicitly remove any DB-related env vars to prove they are not needed.
-    for key in (
-        "ECORACE_DB_PATH",
-        "ECORACE_DB_MOUNT",
-        "ECORACE_REQUIRE_PERSISTENT_DB",
-        "ECORACE_DB_BUSY_TIMEOUT_S",
-    ):
-        env.pop(key, None)
-
     process = subprocess.Popen(
         [
             sys.executable,
@@ -89,13 +80,13 @@ def _stop(process: subprocess.Popen) -> None:
         process.wait(timeout=10)
 
 
-def test_database_free_restart():
+def test_stateless_restart():
     """
     Backend restart sequence (stateless):
-    1. Start API without DB config.
+    1. Start API without persistence configuration.
     2. Submit an optimization, capture the result.
     3. Stop API (simulates restart/redeploy).
-    4. Start API again without DB config.
+    4. Start API again.
     5. Health and reference-data endpoints work.
     6. A new optimization can be submitted.
     7. The old result is NOT available from the backend (expected — browser owns it).
@@ -110,7 +101,7 @@ def test_database_free_restart():
     # --- First instance ---
     process = _start(port)
     try:
-        # Health check without database
+        # Health check
         health = httpx.get(f"{base}/health", timeout=5)
         assert health.status_code == 200
         assert health.json()["status"] == "ok"
@@ -138,10 +129,10 @@ def test_database_free_restart():
     finally:
         _stop(process)
 
-    # --- Second instance (restart, no DB) ---
+    # --- Second instance (restart) ---
     process = _start(port)
     try:
-        # Health works after restart without a database
+        # Health works after restart
         health = httpx.get(f"{base}/health", timeout=5)
         assert health.status_code == 200
         assert health.json()["status"] == "ok"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import os
 import re
 import threading
@@ -32,7 +33,7 @@ _PRUNE_INTERVAL_S: float = 60.0  # prune at most once every 60 seconds
 
 def _limit_for(request: Request) -> tuple[int, int, str]:
     path = request.url.path
-    if path == "/api/v1/health":
+    if path in ("/health", "/api/v1/health"):
         env, default, group = "RATE_LIMIT_HEALTH", "120/minute", "health"
     elif path == "/api/v1/circuits":
         env, default, group = "RATE_LIMIT_CIRCUITS", "60/minute", "circuits"
@@ -58,7 +59,6 @@ def _consume_quota_in_memory(scope: str, limit: int, window_s: int) -> tuple[boo
     """
     now = time.monotonic()
     key = scope
-    retry_after = max(1, int(window_s - (now % window_s)) + 1)
 
     with _QUOTA_LOCK:
         # If tracking too many keys and this key is new, reject/shed or evict
@@ -76,12 +76,14 @@ def _consume_quota_in_memory(scope: str, limit: int, window_s: int) -> tuple[boo
         recent = [t for t in timestamps if t > cutoff]
         if len(recent) >= limit:
             _QUOTA_WINDOWS[key] = recent
+            retry_after = max(1, math.ceil(recent[0] + window_s - now))
             return False, retry_after
         recent.append(now)
         # Bound memory: keep only the most recent entries per key.
         if len(recent) > _MAX_ENTRIES_PER_KEY:
             recent = recent[-_MAX_ENTRIES_PER_KEY:]
         _QUOTA_WINDOWS[key] = recent
+        retry_after = max(1, math.ceil(recent[0] + window_s - now))
     return True, retry_after
 
 
@@ -161,7 +163,9 @@ async def request_id_middleware(request: Request, call_next):
                     request._body = bytes(payload)
         if too_large:
             response = JSONResponse(status_code=413, content=envelope("PAYLOAD_TOO_LARGE", "Request body exceeds the size limit."))
-        elif request.url.path.startswith("/api/v1/") and request.method != "OPTIONS":
+        elif (
+            request.url.path.startswith("/api/v1/") or request.url.path == "/health"
+        ) and request.method != "OPTIONS":
             limit, window_s, group = _limit_for(request)
             client = request.client.host if request.client else "unknown"
             allowed, retry_after = _consume_quota_in_memory(f"{client}:{group}", limit, window_s)
