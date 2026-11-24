@@ -12,8 +12,10 @@ import { ConstraintDiagnostics } from "@/features/results/ConstraintDiagnostics"
 import { MetricsDashboard } from "@/features/results/MetricsDashboard";
 import { PlanComparison } from "@/features/results/PlanComparison";
 import { RunProvenance } from "@/features/results/RunProvenance";
+import { RunReport } from "@/features/results/RunReport";
 import { TravelLegs } from "@/features/results/TravelLegs";
 import { useRunResult } from "@/features/results/useRunResult";
+import { downloadScheduleCsv, downloadTravelLegsCsv } from "@/features/results/exports";
 import type { HoverTarget } from "@/lib/types";
 
 // Client-only: MapLibre needs window/WebGL.
@@ -38,6 +40,7 @@ export default function ResultsPage({ params }: { params: Promise<{ runId: strin
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
+  const printReport = () => window.print();
 
   if (load.state === "loading") {
     return (
@@ -87,8 +90,10 @@ export default function ResultsPage({ params }: { params: Promise<{ runId: strin
 
   const { run } = load;
   return (
-    <AppShell onBack={back}>
-      <PageContainer>
+    <>
+      <div className="screen-only">
+        <AppShell onBack={back}>
+          <PageContainer>
         <ScenarioHeader
           kicker="Optimization result"
           title={
@@ -113,9 +118,25 @@ export default function ResultsPage({ params }: { params: Promise<{ runId: strin
             This route minimizes estimated great-circle travel distance while meeting the listed calendar and weather constraints.
             The longest legs and region changes below help judge its practical travel pattern.
           </p>
-          <button type="button" onClick={download} className="min-h-10 shrink-0 rounded-lg border border-hairline px-3 py-2 font-tel text-sm hover:bg-lift">
-            Download result JSON
-          </button>
+          <details className="relative shrink-0">
+            <summary className="min-h-10 cursor-pointer list-none rounded-lg border border-hairline px-3 py-2 font-tel text-sm hover:bg-lift">
+              Export results <span aria-hidden="true">⌄</span>
+            </summary>
+            <div className="absolute right-0 z-20 mt-2 grid min-w-56 gap-1 rounded-xl border border-hairline bg-card p-2 shadow-2xl">
+              <button type="button" onClick={() => downloadScheduleCsv(run, circuits)} className="rounded-lg px-3 py-2 text-left text-sm hover:bg-lift">
+                Season schedule (CSV)
+              </button>
+              <button type="button" onClick={() => downloadTravelLegsCsv(run, circuits)} className="rounded-lg px-3 py-2 text-left text-sm hover:bg-lift">
+                Travel legs (CSV)
+              </button>
+              <button type="button" onClick={printReport} className="rounded-lg px-3 py-2 text-left text-sm hover:bg-lift">
+                Summary report (PDF)
+              </button>
+              <button type="button" onClick={download} className="rounded-lg px-3 py-2 text-left text-sm hover:bg-lift">
+                Full result (JSON)
+              </button>
+            </div>
+          </details>
         </div>
 
         <MetricsDashboard run={run} />
@@ -133,7 +154,10 @@ export default function ResultsPage({ params }: { params: Promise<{ runId: strin
         </div>
 
         <RunProvenance run={run} />
-      </PageContainer>
-    </AppShell>
+          </PageContainer>
+        </AppShell>
+      </div>
+      <RunReport run={run} />
+    </>
   );
 }
