@@ -3,9 +3,38 @@
 import { useEffect, useState } from "react";
 import { getRun, recentRunIds, saveRun } from "@/lib/recent-runs";
 import type { RunPayload } from "@/lib/types";
+import { summarizeActiveConstraints } from "@/features/results/constraintSummary";
 
 function metric(value: number | undefined): string {
   return value === undefined ? "Not recorded" : Math.round(value).toLocaleString("en-US");
+}
+
+function scenarioDifferences(current: RunPayload, previous: RunPayload): string[] {
+  const differences: string[] = [];
+  if (current.season_year !== previous.season_year) differences.push(`Season: ${current.season_year} vs ${previous.season_year}`);
+  if (current.calendar.race_count !== previous.calendar.race_count) differences.push(`Race count: ${current.calendar.race_count} vs ${previous.calendar.race_count}`);
+  if (current.data_version !== previous.data_version) differences.push(`Data version: ${current.data_version} vs ${previous.data_version}`);
+
+  const a = current.provenance?.scenario;
+  const b = previous.provenance?.scenario;
+  if (!a || !b) {
+    differences.push("Full scenario settings are not recorded for both runs.");
+  } else {
+    const circuitsA = [...a.circuit_ids].sort().join(",");
+    const circuitsB = [...b.circuit_ids].sort().join(",");
+    if (circuitsA !== circuitsB) differences.push("Circuit selections differ.");
+    if (a.max_consecutive !== b.max_consecutive) differences.push(`Maximum consecutive races: ${a.max_consecutive} vs ${b.max_consecutive}`);
+    const breakA = a.summer_break_start === null || a.summer_break_end === null ? "none" : `${a.summer_break_start + 1}-${a.summer_break_end + 1}`;
+    const breakB = b.summer_break_start === null || b.summer_break_end === null ? "none" : `${b.summer_break_start + 1}-${b.summer_break_end + 1}`;
+    if (breakA !== breakB) differences.push(`Summer break weeks: ${breakA} vs ${breakB}`);
+    if (a.pin_end_to_dec_week1 !== b.pin_end_to_dec_week1) differences.push("Finale pin settings differ.");
+  }
+  return differences;
+}
+
+function activeConstraintScore(run: RunPayload): string {
+  const { passed, active } = summarizeActiveConstraints(run);
+  return `${passed}/${active}`;
 }
 
 export function PlanComparison({ run }: { run: RunPayload }) {
@@ -41,8 +70,9 @@ export function PlanComparison({ run }: { run: RunPayload }) {
     ["Longest leg", `${metric(run.metrics.longest_hop_km)} km`, `${metric(other.metrics.longest_hop_km)} km`],
     ["Legs over 5,000 km", metric(run.metrics.hops_over_5000_km), metric(other.metrics.hops_over_5000_km)],
     ["Region re-entries", metric(run.metrics.region_backtracks), metric(other.metrics.region_backtracks)],
-    ["Constraints passed", `${run.constraints.filter((c) => c.satisfied).length}/${run.constraints.length}`, `${other.constraints.filter((c) => c.satisfied).length}/${other.constraints.length}`],
+    ["Active constraints passed", activeConstraintScore(run), activeConstraintScore(other)],
   ] : [];
+  const differences = other ? scenarioDifferences(run, other) : [];
 
   return (
     <section aria-label="Plan comparison" className="rounded-xl border border-hairline bg-card p-4">
@@ -56,6 +86,16 @@ export function PlanComparison({ run }: { run: RunPayload }) {
       {selected && !other && !error && <p role="status" className="mt-2 text-sm text-mute">Loading comparison…</p>}
       {other && (
         <div className="mt-3 overflow-x-auto">
+          <div className="mb-3 rounded-lg border border-hairline bg-base/50 p-3 text-sm">
+            <p className="font-medium">{differences.length === 0 ? "Equivalent scenario settings" : "Scenario differences"}</p>
+            {differences.length > 0 ? (
+              <ul className="mt-1 list-inside list-disc text-mute">
+                {differences.map((difference) => <li key={difference}>{difference}</li>)}
+              </ul>
+            ) : (
+              <p className="mt-1 text-mute">The metrics below are based on matching season, venues, constraints, and dataset.</p>
+            )}
+          </div>
           <table className="w-full min-w-[32rem] text-left text-sm">
             <thead><tr className="border-b border-hairline"><th className="py-2 pr-3 font-medium">Measure</th><th className="py-2 pr-3 font-medium">Current plan</th><th className="py-2 font-medium">Previous plan</th></tr></thead>
             <tbody>{rows.map(([label, current, previous]) => <tr key={label} className="border-b border-hairline"><th className="py-2 pr-3 font-normal text-mute">{label}</th><td className="py-2 pr-3 font-tel tabular-nums">{current}</td><td className="py-2 font-tel tabular-nums">{previous}</td></tr>)}</tbody>

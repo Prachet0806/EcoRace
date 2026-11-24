@@ -79,7 +79,7 @@ See **[QUICKSTART.md](QUICKSTART.md)** — backend + frontend up in ~5 minutes.
 - Horizon: first Fri–Sun on/after Mar 1 → first Friday whose Sunday covers
   Dec 1 (40 weekends for 2025/2026); weekend ID = Friday date.
 - Exact-match MVP: `len(circuit_ids) == race_count` (20–24).
-- Streak limit configurable `max_consecutive` 2–7 (default 3), enforced with
+- Streak limit configurable `max_consecutive` 2–4 (default 3), enforced with
   a mandatory break after a full run.
 - Optional summer-break window (0-based weekend indices) excludes weekends
   from scheduling; the finale pin fixes the last race to the final horizon

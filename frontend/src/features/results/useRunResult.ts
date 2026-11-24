@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { RunPayload } from "@/lib/types";
-import { getStoredRun } from "@/lib/recent-runs";
+import { getStoredRun, isValidRunPayload } from "@/lib/recent-runs";
 import { useScenarioStore } from "@/lib/scenario-store";
 
 export type LoadState =
@@ -17,7 +17,7 @@ export type LoadState =
 export function useRunResult(runId: string): LoadState {
   const immediateResult = useScenarioStore((s) => s.immediateResult);
   const [load, setLoad] = useState<LoadState>(() => {
-    if (immediateResult && immediateResult.run_id === runId) {
+    if (immediateResult && immediateResult.run_id === runId && isValidRunPayload(immediateResult)) {
       return { state: "ready", run: immediateResult, source: "memory" };
     }
     return { state: "loading" };
@@ -25,7 +25,7 @@ export function useRunResult(runId: string): LoadState {
 
   useEffect(() => {
     // 1. In-memory check
-    if (immediateResult && immediateResult.run_id === runId) {
+    if (immediateResult && immediateResult.run_id === runId && isValidRunPayload(immediateResult)) {
       setLoad({ state: "ready", run: immediateResult, source: "memory" });
       return;
     }

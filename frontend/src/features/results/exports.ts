@@ -35,7 +35,7 @@ function raceNumber(races: RunPayload["calendar"]["races"]): Map<string, number>
   return new Map(races.map((race, index) => [race.race_id, index + 1]));
 }
 
-export function downloadScheduleCsv(run: RunPayload, circuits: Circuit[]): void {
+export function buildScheduleCsv(run: RunPayload, circuits: Circuit[]): string {
   const races = run.calendar.races;
   const byRaceId = new Map(races.map((race) => [race.race_id, race]));
   const incomingLeg = new Map(run.segments.map((segment) => [segment.to_race_id, segment]));
@@ -71,7 +71,7 @@ export function downloadScheduleCsv(run: RunPayload, circuits: Circuit[]): void 
     ];
   });
 
-  const csv = toCsv(
+  return toCsv(
     [
       "season_year", "run_id", "run_status", "race_number", "race_id", "weekend_id",
       "friday", "saturday", "sunday", "circuit_id", "circuit_name", "city", "country",
@@ -79,10 +79,13 @@ export function downloadScheduleCsv(run: RunPayload, circuits: Circuit[]): void 
     ],
     rows,
   );
-  saveCsv(`ecorace-${run.run_id}-schedule.csv`, csv);
 }
 
-export function downloadTravelLegsCsv(run: RunPayload, circuits: Circuit[]): void {
+export function downloadScheduleCsv(run: RunPayload, circuits: Circuit[]): void {
+  saveCsv(`ecorace-${run.run_id}-schedule.csv`, buildScheduleCsv(run, circuits));
+}
+
+export function buildTravelLegsCsv(run: RunPayload, circuits: Circuit[]): string {
   const races = new Map(run.calendar.races.map((race) => [race.race_id, race]));
   const numbers = raceNumber(run.calendar.races);
   const rows = run.segments.map((segment, index) => {
@@ -119,7 +122,7 @@ export function downloadTravelLegsCsv(run: RunPayload, circuits: Circuit[]): voi
     ];
   });
 
-  const csv = toCsv(
+  return toCsv(
     [
       "season_year", "run_id", "leg_number", "segment_id", "from_race_number", "from_race_id",
       "from_circuit_id", "from_circuit_name", "from_city", "from_country", "from_region",
@@ -128,5 +131,8 @@ export function downloadTravelLegsCsv(run: RunPayload, circuits: Circuit[]): voi
     ],
     rows,
   );
-  saveCsv(`ecorace-${run.run_id}-travel-legs.csv`, csv);
+}
+
+export function downloadTravelLegsCsv(run: RunPayload, circuits: Circuit[]): void {
+  saveCsv(`ecorace-${run.run_id}-travel-legs.csv`, buildTravelLegsCsv(run, circuits));
 }

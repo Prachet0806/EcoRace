@@ -116,11 +116,11 @@ curl -fsS -X POST "$API/api/v1/optimization/runs" \
   -d "{\"race_count\":20,\"circuit_ids\":$IDS,\"budget_s\":9}" \
   | jq -e '.status | test("feasible")'
 
-# Invalid request
+# Invalid request (empty circuit_ids fails request-schema validation)
 curl -fsS -X POST "$API/api/v1/optimization/runs" \
   -H 'content-type: application/json' \
   -d '{"race_count":22,"circuit_ids":[]}' \
-  | jq -e '.error.code == "INSUFFICIENT_CIRCUITS"'
+  | jq -e '.error.code == "INVALID_REQUEST"'
 ```
 
 ## Pre-flight (run before every deploy)

@@ -25,7 +25,7 @@ const SelectionMap = dynamic(() => import("@/features/geography/SelectionMap").t
   loading: () => <p className="font-tel text-sm text-mute">Loading preview…</p>,
 });
 import { EcoRaceApiError, api } from "@/lib/api-client";
-import { saveRun } from "@/lib/recent-runs";
+import { isValidRunPayload, saveRun } from "@/lib/recent-runs";
 import { MAX_RACES, MIN_RACES, selectionError, useScenarioStore } from "@/lib/scenario-store";
 
 // Builder workstation v2.1: header → status → workspace → geography →
@@ -129,8 +129,8 @@ export default function EcoRacePage() {
 
         setOptimizationPhase("validating");
         // Verify basic result structure before navigation
-        if (!result || typeof result !== "object" || !result.run_id) {
-          throw new Error("Returned optimization result was malformed or missing run_id.");
+        if (!isValidRunPayload(result)) {
+          throw new Error("Returned optimization result was incomplete or malformed.");
         }
 
         try {
@@ -177,9 +177,9 @@ export default function EcoRacePage() {
         setRaceCount(officialIds.length);
         setCalendarSource(source);
       } else {
-        // Returning to Custom starts a fresh draft: reset the count to 0
-        // rather than inheriting the official 24-race selection.
+        // Returning to Custom starts a fresh draft at the standard target.
         clear();
+        setRaceCount(MIN_RACES);
         setCalendarSource(source);
       }
     },

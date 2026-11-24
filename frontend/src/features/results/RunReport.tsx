@@ -1,4 +1,5 @@
 import type { RunPayload } from "@/lib/types";
+import { constraintReportState, summarizeActiveConstraints } from "@/features/results/constraintSummary";
 
 function dateLabel(date: string): string {
   const parsed = new Date(`${date}T12:00:00Z`);
@@ -21,7 +22,7 @@ function statusLabel(run: RunPayload): string {
 export function RunReport({ run }: { run: RunPayload }) {
   const racesById = new Map(run.calendar.races.map((race) => [race.race_id, race]));
   const incoming = new Map(run.segments.map((segment) => [segment.to_race_id, segment]));
-  const passed = run.constraints.filter((constraint) => constraint.satisfied).length;
+  const activeConstraints = summarizeActiveConstraints(run);
   const provenance = run.provenance;
 
   return (
@@ -47,7 +48,7 @@ export function RunReport({ run }: { run: RunPayload }) {
           <div><span>Longest leg</span><strong>{run.metrics.longest_hop_km === undefined ? "Unavailable" : `${number(run.metrics.longest_hop_km)} km`}</strong></div>
           <div><span>Regional re-entries</span><strong>{number(run.metrics.region_backtracks)}</strong></div>
           <div><span>Races / weekends</span><strong>{run.calendar.race_count} / {run.calendar.weekend_count}</strong></div>
-          <div><span>Constraints passed</span><strong>{passed} / {run.constraints.length}</strong></div>
+          <div><span>Active constraints passed</span><strong>{activeConstraints.passed} / {activeConstraints.active}</strong></div>
         </div>
       </section>
 
@@ -105,17 +106,21 @@ export function RunReport({ run }: { run: RunPayload }) {
       <section className="report-section" aria-labelledby="report-constraints-title">
         <h2 id="report-constraints-title">Constraint checks</h2>
         <ul className="report-constraint-list">
-          {run.constraints.map((constraint) => (
-            <li key={constraint.name}>
-              <span className={constraint.satisfied ? "report-check-pass" : "report-check-fail"}>
-                {constraint.satisfied ? "PASS" : "REVIEW"}
-              </span>
-              <span>{constraint.name}</span>
-              {!constraint.satisfied && constraint.violations.length > 0 && (
-                <span className="report-muted">{constraint.violations.length} violation(s)</span>
-              )}
-            </li>
-          ))}
+          {run.constraints.map((constraint) => {
+            const state = constraintReportState(constraint, run);
+            const style = state === "PASS" ? "report-check-pass"
+              : state === "REVIEW" ? "report-check-fail"
+                : state === "NOT APPLICABLE" ? "report-check-na" : "report-check-unknown";
+            return (
+              <li key={constraint.name}>
+                <span className={style}>{state}</span>
+                <span>{constraint.name}</span>
+                {state === "REVIEW" && constraint.violations.length > 0 && (
+                  <span className="report-muted">{constraint.violations.length} violation(s)</span>
+                )}
+              </li>
+            );
+          })}
         </ul>
         {run.constraints.some((constraint) => constraint.violations.length > 0) && (
           <table className="report-table report-violations">
@@ -144,8 +149,12 @@ export function RunReport({ run }: { run: RunPayload }) {
       </section>
 
       <footer className="report-footer">
-        Distances are great-circle estimates, not emissions. Weather data is a synthetic demonstration fixture.
-        This report summarizes a planning result and is not an authoritative race calendar.
+        Distances are great-circle estimates, not emissions. {provenance?.weather_synthetic === true
+          ? "Weather data is a synthetic demonstration fixture."
+          : provenance?.weather_synthetic === false
+            ? "Weather data is from the source identified in run provenance."
+            : "Weather data source is not recorded in run provenance."}
+        {" "}This report summarizes a planning result and is not an authoritative race calendar.
       </footer>
     </article>
   );

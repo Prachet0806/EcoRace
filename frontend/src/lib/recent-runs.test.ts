@@ -39,6 +39,21 @@ Object.defineProperty(globalThis, "sessionStorage", {
   writable: true,
 });
 
+const mockRaces = Array.from({ length: 20 }, (_, index) => {
+  const date = `2026-03-${String(index + 1).padStart(2, "0")}`;
+  return {
+    race_id: `race_${index + 1}`,
+    weekend_id: date,
+    friday: date,
+    saturday: date,
+    sunday: date,
+    circuit_id: `circuit_${index + 1}`,
+    circuit_name: `Circuit ${index + 1}`,
+    latitude: 10 + index,
+    longitude: 20 + index,
+  };
+});
+
 const mockPayload: RunPayload = {
   run_id: "run_0123456789abcdef0123456789abcdef",
   status: "optimal",
@@ -54,21 +69,28 @@ const mockPayload: RunPayload = {
   },
   data_version: "2026.1",
   calendar: {
-    races: [],
-    breaks: [],
+    races: mockRaces,
+    breaks: ["break_1", "break_2", "break_3", "break_4"],
     weekend_count: 24,
     race_count: 20,
     break_count: 4,
     max_streak: 3,
   },
-  segments: [],
+  segments: mockRaces.slice(1).map((race, index) => ({
+    segment_id: `segment_${index + 1}`,
+    from_race_id: mockRaces[index].race_id,
+    to_race_id: race.race_id,
+    from_circuit_id: mockRaces[index].circuit_id,
+    to_circuit_id: race.circuit_id,
+    distance_km: 1000 + index,
+  })),
   metrics: {
     total_distance_km: 45000,
     baseline_distance_km: 50000,
     saving_km: 5000,
     baseline_status: "calculated",
   },
-  constraints: [],
+    constraints: [{ name: "weather", satisfied: true, violations: [] }],
 };
 
 describe("recent-runs and validation", () => {
@@ -89,6 +111,37 @@ describe("recent-runs and validation", () => {
     expect(isValidRunPayload({ run_id: "invalid_id" })).toBe(false);
     expect(isValidRunPayload({ ...mockPayload, calendar: null })).toBe(false);
     expect(isValidRunPayload({ ...mockPayload, metrics: {} })).toBe(false);
+  });
+
+  it("rejects incomplete fields used by the results UI", () => {
+    expect(isValidRunPayload({ ...mockPayload, solver: undefined })).toBe(false);
+    expect(isValidRunPayload({
+      ...mockPayload,
+      calendar: { ...mockPayload.calendar, breaks: undefined },
+    })).toBe(false);
+    expect(isValidRunPayload({
+      ...mockPayload,
+      metrics: { ...mockPayload.metrics, baseline_status: undefined },
+    })).toBe(false);
+    expect(isValidRunPayload({
+      ...mockPayload,
+      calendar: { ...mockPayload.calendar, races: [{ race_id: "incomplete" }] },
+    })).toBe(false);
+    expect(isValidRunPayload({ ...mockPayload, segments: [{ segment_id: "incomplete" }] })).toBe(false);
+    expect(isValidRunPayload({
+      ...mockPayload,
+      constraints: [{ name: "weather", satisfied: true }],
+    })).toBe(false);
+  });
+
+  it("rejects segments that reference missing or mismatched races", () => {
+    const invalid = {
+      ...mockPayload,
+      segments: mockPayload.segments.map((segment, index) => index === 0
+        ? { ...segment, to_race_id: "missing-race" }
+        : segment),
+    };
+    expect(isValidRunPayload(invalid)).toBe(false);
   });
 
   it("stores and retrieves a valid run", () => {

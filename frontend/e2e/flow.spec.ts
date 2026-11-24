@@ -12,7 +12,7 @@ test("frontend health endpoint responds", async ({ request }) => {
 
 test("optimize button is gated until exact-match selection", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "→ Run optimization" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Run optimization" })).toBeDisabled();
   await expect(
     page.getByRole("region", { name: "Optimization command" }).getByText("Select 20 more tracks (0/20)."),
   ).toBeVisible();
@@ -75,7 +75,7 @@ test("status rail and preview track the selection", async ({ page }) => {
   }
   await expect(page.getByText("Selected (20)")).toBeVisible();
 
-  const optimize = page.getByRole("button", { name: "→ Run optimization" });
+  const optimize = page.getByRole("button", { name: "Run optimization" });
   await expect(optimize).toBeEnabled();
   await optimize.click();
 
@@ -99,7 +99,7 @@ test("status rail and preview track the selection", async ({ page }) => {
   await expect(page.getByText("Selected (19)")).toBeVisible();
   await page.getByRole("button", { name: /^Select / }).first().click();
   await expect(page.getByText("Selected (20)")).toBeVisible();
-  await page.getByRole("button", { name: "→ Run optimization" }).click();
+  await page.getByRole("button", { name: "Run optimization" }).click();
   await expect(page).toHaveURL(/\/results\/run_/, { timeout: 120_000 });
   const secondRunId = page.url().split("/").pop()!;
   expect(secondRunId).not.toBe(firstRunId);
@@ -125,6 +125,7 @@ test("official venue set loads the 24-race preset without auto-running", async (
   // Switching back to Custom resets to an empty draft.
   await page.getByRole("button", { name: /Custom calendar/ }).click();
   await expect(page.getByText("Selected (0)").first()).toBeVisible();
+  await expect(page.getByRole("group", { name: "Race count" })).toContainText("20");
   await expect(page).not.toHaveURL(/\/results\/run_/);
-  await expect(page.getByRole("button", { name: "→ Run optimization" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Run optimization" })).toBeDisabled();
 });
