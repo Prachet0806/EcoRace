@@ -62,6 +62,13 @@ export default function EcoRacePage() {
 
   const [optimizationPhase, setOptimizationPhase] = useState<OptimizationPhase>("idle");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [scenarioHydrated, setScenarioHydrated] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = useScenarioStore.persist.onFinishHydration(() => setScenarioHydrated(true));
+    if (useScenarioStore.persist.hasHydrated()) setScenarioHydrated(true);
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     if (optimizationPhase === "idle" || optimizationPhase === "complete" || optimizationPhase === "error") {
@@ -75,16 +82,16 @@ export default function EcoRacePage() {
     return () => window.clearInterval(interval);
   }, [optimizationPhase]);
 
-  // Default summer break: first 3 August weekends, applied once when the
-  // season loads and no explicit choice exists. Turning it off afterwards
-  // sticks for the session.
+  // Default summer break: first 3 August weekends, applied once after the
+  // persisted scenario loads and no explicit choice exists. An explicit Off
+  // choice remains off across builder reloads.
   const augustDefaultApplied = useRef(false);
   useEffect(() => {
-    if (weekends.length === 0 || summerBreak !== undefined || augustDefaultApplied.current) return;
+    if (!scenarioHydrated || weekends.length === 0 || summerBreak !== undefined || augustDefaultApplied.current) return;
     augustDefaultApplied.current = true;
     const august = firstAugustWeeks(weekends, 3);
     if (august) setSummerBreak(august);
-  }, [weekends, summerBreak, setSummerBreak]);
+  }, [scenarioHydrated, weekends, summerBreak, setSummerBreak]);
 
   const invalid = selectionError(selectedTrackIds.length, raceCount);
   const running = status === "optimizing";
