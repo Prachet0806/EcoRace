@@ -1,30 +1,48 @@
 # EcoRace Planner — Render Blueprint (backend only; frontend deploys on Vercel).
 # Apply via "New +" → "Blueprint" in the Render dashboard, or `render blueprint launch`.
-# No persistent disk: SQLite at /var/data/ecorace.db is ephemeral by design (MVP).
-# If you later need run persistence, add a disk mounted at /var/data
-# (NOT /app/data — that would shadow the baked-in reference data).
+# Stateless architecture: no persistent disk, no database, no durable storage.
+# Reference data (circuits, seasons, weather) is baked into the Docker image.
+# Do not mount over /app/data; that directory contains the reference data.
 
 services:
   - type: web
     name: ecorace-api
     runtime: docker
+    # The stateless solver still needs adequate memory for 24-race OR-Tools solves.
+    # Benchmark on the target container before choosing a smaller plan.
     plan: free
     dockerfilePath: backend/Dockerfile
     dockerContext: .
     healthCheckPath: /api/v1/health
+    # No persistent disk — results live in browser session storage only.
     envVars:
-      # Set in the Render dashboard after the Vercel app exists
-      # (NEXT_PUBLIC_ECORACE_API_URL on Vercel must point back here).
+      # Set in the Render dashboard after the Vercel app exists.
+      # (NEXT_PUBLIC_ECORACE_API_URL on Vercel must point back here.)
       - key: ECORACE_CORS_ORIGINS
         sync: false
       - key: ECORACE_CORS_ALLOW_LAN
         value: "0"
       - key: SOLVER_TIMEOUT_SECONDS
         value: "45"
+      - key: SOLVER_CP_SAT_PRESOLVE
+        value: "1"
+      - key: SOLVER_DIAGNOSTICS
+        value: "0"
       - key: SOLVER_MAX_CONCURRENT
         value: "1"
+      - key: SOLVER_CIRCUIT_BREAKER_THRESHOLD
+        value: "5"
+      - key: SOLVER_CIRCUIT_BREAKER_COOLDOWN_S
+        value: "60"
+      - key: RATE_LIMIT_RUNS
+        value: "10/minute"
+      - key: RATE_LIMIT_HEALTH
+        value: "120/minute"
+      - key: RATE_LIMIT_CIRCUITS
+        value: "60/minute"
+      - key: RATE_LIMIT_WEEKENDS
+        value: "60/minute"
+      - key: ECORACE_MAX_REQUEST_BYTES
+        value: "16384"
       - key: LOG_LEVEL
         value: INFO
-      # Baked into the Dockerfile already; listed here to pin the contract.
-      - key: ECORACE_DB_PATH
-        value: /var/data/ecorace.db

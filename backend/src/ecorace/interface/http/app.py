@@ -5,7 +5,9 @@ Config (env):
   ECORACE_CORS_ALLOW_LAN: auto-allow this machine's private-IPv4 origins on
     ports 3000/3100 (default 1; set 0 to disable). Covers phone/LAN testing
     without hand-maintaining IPs.
-  SOLVER_TIMEOUT_SECONDS: total sync budget per run (default 30; split across seeds)
+  SOLVER_TIMEOUT_SECONDS: total sync budget per run (default 30; one seed gets remaining time)
+  SOLVER_CP_SAT_PRESOLVE: first attempt presolve (default 1; set 0 for comparison)
+  SOLVER_DIAGNOSTICS: bounded CP-SAT progress log (default 0)
   ECORACE_DATA_DIR: override reference-data directory
   LOG_LEVEL: logging level (default INFO)
   SOLVER_CIRCUIT_BREAKER_THRESHOLD: consecutive failures before open (default 5)
@@ -15,9 +17,8 @@ Config (env):
   RATE_LIMIT_CIRCUITS: circuits endpoint limit (default 60/minute)
   RATE_LIMIT_WEEKENDS: season weekends endpoint limit (default 60/minute)
   RATE_LIMIT_RUNS: optimization creation limit (default 10/minute)
-  RATE_LIMIT_GET_RUN: result read limit (default 60/minute)
   SOLVER_MAX_CONCURRENT: solver slots per process (default 1)
-  ECORACE_DB_PATH: SQLite database path (default ./data/ecorace.db)
+  ECORACE_MAX_REQUEST_BYTES: maximum request body size (default 16384)
 """
 
 from __future__ import annotations
@@ -29,20 +30,17 @@ import socket
 import threading
 
 from ecorace.application.optimization_service import AppError
-from ecorace.infrastructure import persistence
 from ecorace.interface.http.errors import (
     app_error_handler,
     internal_error_handler,
     validation_handler,
 )
 from ecorace.interface.http.logging import request_id_middleware, setup_logging
-from ecorace.interface.http.routes import limiter, router
+from ecorace.interface.http.routes import router
 from ecorace.optimization.circuit_breaker import CircuitBreaker
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
 
 
 def _lan_origins() -> list[str]:
@@ -96,7 +94,8 @@ def create_app() -> FastAPI:
             else ""
         ),
         allow_methods=["GET", "POST"],
-        allow_headers=["content-type"],
+        allow_headers=["content-type", "x-request-id"],
+        expose_headers=["x-request-id", "retry-after"],
     )
 
     app.middleware("http")(request_id_middleware)
@@ -108,21 +107,26 @@ def create_app() -> FastAPI:
     )
 
     app.state.solver_budget_s = float(os.environ.get("SOLVER_TIMEOUT_SECONDS", "30"))
+    app.state.solver_first_attempt_presolve = os.environ.get(
+        "SOLVER_CP_SAT_PRESOLVE", "1"
+    ) == "1"
+    app.state.solver_diagnostics_enabled = os.environ.get(
+        "SOLVER_DIAGNOSTICS", "0"
+    ) == "1"
     app.state.solver_slots = threading.BoundedSemaphore(
         max(1, int(os.environ.get("SOLVER_MAX_CONCURRENT", "1")))
     )
-
-    app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-    # Initialize database
-    persistence.init_db()
 
     app.add_exception_handler(AppError, app_error_handler)
     app.add_exception_handler(RequestValidationError, validation_handler)
     app.add_exception_handler(Exception, internal_error_handler)
 
     app.include_router(router)
+
+    # Root-level health probe — no prefix so orchestrators/LB hit GET /health
+    from ecorace.interface.http import routes as _routes
+    app.add_api_route("/health", _routes.health, methods=["GET"], include_in_schema=False)
+
     return app
 
 

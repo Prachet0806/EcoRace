@@ -14,7 +14,7 @@ interface Props {
 
 export function SelectedTracksPane({ circuits, seasonYear, locked, onToggle, onClear }: Props) {
   return (
-    <div className="rounded-lg border border-hairline bg-card p-3">
+    <div className="flex h-full flex-col rounded-xl border border-hairline bg-card p-4">
       <div className="mb-2 flex items-center justify-between">
         <SectionLabel>Your calendar</SectionLabel>
         {circuits.length > 0 && !locked && (
@@ -24,12 +24,17 @@ export function SelectedTracksPane({ circuits, seasonYear, locked, onToggle, onC
         )}
       </div>
       {locked && (
-        <p className="mb-2 font-tel text-xs tracking-widest text-mute uppercase">Locked to official set</p>
+        <p className="mb-2 font-tel text-xs text-mute">Locked to official set</p>
       )}
       {/* Frozen e2e string: exact selected count. */}
-      <p className="mb-2 font-tel text-xs text-mute">Selected ({circuits.length}) · selection order preserved</p>
+      <p className="mb-2 font-tel text-xs text-mute">Selected ({circuits.length}) · optimizer chooses race order</p>
       {circuits.length === 0 ? (
-        <p className="text-sm text-mute">No tracks selected yet. Pick from the available list.</p>
+        <div className="flex min-h-48 flex-1 flex-col justify-center rounded-lg border border-dashed border-hairline px-6 text-center">
+          <p className="text-sm text-ink">No circuits selected</p>
+          <p className="mt-2 text-sm leading-5 text-mute">
+            Choose 20–24 circuits from the library. The optimizer will assign dates and order.
+          </p>
+        </div>
       ) : (
         <ul className="max-h-96 space-y-1 overflow-y-auto" aria-label="Selected tracks">
           {circuits.map((c, i) => (

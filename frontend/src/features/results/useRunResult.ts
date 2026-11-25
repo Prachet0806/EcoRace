@@ -1,46 +1,55 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { EcoRaceApiError, api } from "@/lib/api-client";
 import type { RunPayload } from "@/lib/types";
+import { getStoredRun, isValidRunPayload } from "@/lib/recent-runs";
+import { useScenarioStore } from "@/lib/scenario-store";
 
 export type LoadState =
   | { state: "loading" }
-  | { state: "ready"; run: RunPayload; source: "session" | "api" }
+  | { state: "ready"; run: RunPayload; source: "session" | "memory" }
   | { state: "missing" }
-  | { state: "error"; code: string; message: string };
+  | { state: "invalid"; reason?: string }
+  | { state: "storage_unavailable" };
 
-// Results loader: sessionStorage stash first, then persisted API data.
-// On an ephemeral deployment, browser storage may outlive the API database.
+// Results loader: checks in-memory immediate result from zustand store first,
+// then falls back to sessionStorage. This ensures results survive storage failure / quota exhaustion.
 export function useRunResult(runId: string): LoadState {
-  const [load, setLoad] = useState<LoadState>({ state: "loading" });
+  const immediateResult = useScenarioStore((s) => s.immediateResult);
+  const [load, setLoad] = useState<LoadState>(() => {
+    if (immediateResult && immediateResult.run_id === runId && isValidRunPayload(immediateResult)) {
+      return { state: "ready", run: immediateResult, source: "memory" };
+    }
+    return { state: "loading" };
+  });
 
   useEffect(() => {
-    let cancelled = false;
-    try {
-      const raw = sessionStorage.getItem(`ecorace:run:${runId}`);
-      if (raw) {
-        const run = JSON.parse(raw) as RunPayload;
-        if (!cancelled) setLoad({ state: "ready", run, source: "session" });
-        return;
-      }
-    } catch {
-      // Corrupt stash: fall through to API.
+    // 1. In-memory check
+    if (immediateResult && immediateResult.run_id === runId && isValidRunPayload(immediateResult)) {
+      setLoad({ state: "ready", run: immediateResult, source: "memory" });
+      return;
     }
-    api
-      .getRun(runId)
-      .then((run) => {
-        if (!cancelled) setLoad({ state: "ready", run: run as unknown as RunPayload, source: "api" });
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        if (e instanceof EcoRaceApiError && e.code === "RUN_NOT_FOUND") setLoad({ state: "missing" });
-        else setLoad({ state: "error", code: e instanceof EcoRaceApiError ? e.code : "REQUEST_FAILED", message: e instanceof Error ? e.message : "Failed to load result." });
-      });
+
+    // 2. Session-storage check with explicit error discrimination
+    let cancelled = false;
+    const stored = getStoredRun(runId);
+
+    if (cancelled) return;
+
+    if (stored.status === "found") {
+      setLoad({ state: "ready", run: stored.run, source: "session" });
+    } else if (stored.status === "corrupt") {
+      setLoad({ state: "invalid", reason: stored.reason });
+    } else if (stored.status === "storage_unavailable") {
+      setLoad({ state: "storage_unavailable" });
+    } else {
+      setLoad({ state: "missing" });
+    }
+
     return () => {
       cancelled = true;
     };
-  }, [runId]);
+  }, [runId, immediateResult]);
 
   return load;
 }

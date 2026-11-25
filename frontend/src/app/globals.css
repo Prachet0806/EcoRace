@@ -12,17 +12,20 @@
   --ink-secondary: #a8a8b0;
   --line: #2a2a30;
   --rosso: #e10600;
-  --rosso-hover: #f6120c;
+  --rosso-hover: #c90500;
+  --rosso-ink: #ff625b;
+  --rosso-label: #ff817b;
+  --rosso-label: #ff817b;
   --giallo: #ffeb00;
   --pass: #22c55e;
-  --focus: var(--rosso);
+  --focus: var(--rosso-ink);
 }
 
 /* Future light theme (stub — implement toggle per ADR-FE-006):
 :root[data-theme="light"] {
   --surface-base: #fafafa; --surface-card: #ffffff; --surface-hover: #f1f1f2;
   --ink-primary: #141417; --ink-secondary: #52525b; --line: #e4e4e7;
-  --rosso: #c40500; --rosso-hover: #e10600; --giallo: #b59a00;
+  --rosso: #c40500; --rosso-hover: #a60400; --rosso-ink: #aa0500; --giallo: #b59a00;
   --pass: #15803d; --focus: var(--rosso);
 }
 */
@@ -36,6 +39,7 @@
   --color-hairline: var(--line);
   --color-rosso: var(--rosso);
   --color-rosso-hi: var(--rosso-hover);
+  --color-rosso-ink: var(--rosso-ink);
   --color-giallo: var(--giallo);
   --color-pass: var(--pass);
   /* Additive hierarchy aliases (V2): existing utilities above unchanged. */
@@ -45,7 +49,7 @@
   --color-content-inverse: var(--surface-base);
   --color-success: var(--pass);
   --color-warning: var(--giallo);
-  --color-error: var(--rosso);
+  --color-error: var(--rosso-ink);
   --color-info: var(--ink-secondary);
   --font-display: var(--font-display);
   --font-tel: var(--font-tel);
@@ -105,23 +109,98 @@ body {
   background: var(--surface-hover);
 }
 
-/* Strong variant: always-visible Rosso frame, display type, fills on hover. */
+/* Back navigation keeps the chamfer without competing with the primary action. */
 .chamfer-strong {
-  background: linear-gradient(to right, var(--rosso) 0 55%, var(--giallo) 55% 100%);
+  background: var(--line);
 }
 .chamfer-btn-strong {
-  padding: 8px 20px;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 13px;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
+  padding: 10px 16px;
+  font-weight: 500;
+  font-size: 14px;
   color: var(--ink-primary);
   background: var(--surface-card);
 }
 .chamfer-btn-strong:hover {
-  color: #fff;
-  background: var(--rosso);
+  color: var(--ink-primary);
+  background: var(--surface-hover);
+}
+
+/* Print/PDF layout, rendered from the live result so tab-scoped data remains available. */
+.print-only-report { display: none; }
+.report-sheet {
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 16mm;
+  background: #fff;
+  color: #18181b;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 10pt;
+  line-height: 1.45;
+  box-shadow: 0 16px 50px rgb(0 0 0 / 35%);
+}
+.report-header {
+  border-top: 6px solid #e10600;
+  padding-top: 0.85rem;
+}
+.report-kicker {
+  margin: 0 0 0.8rem;
+  color: #bd100b;
+  font-size: 8pt;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+.report-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.report-title-row h1 { margin: 0; font-size: 24pt; line-height: 1.15; }
+.report-subtitle { margin: 0.35rem 0 0; color: #52525b; }
+.report-status {
+  flex: none;
+  border: 1px solid #16803c;
+  border-radius: 999px;
+  padding: 0.25rem 0.65rem;
+  color: #12632f;
+  font-size: 8pt;
+  text-transform: capitalize;
+}
+.report-run-id { margin: 0.8rem 0 0; border-left: 3px solid #f0c928; padding-left: 0.5rem; color: #52525b; font-family: monospace; font-size: 8pt; }
+.report-section { margin-top: 1.35rem; break-inside: avoid; }
+.report-section h2 { margin: 0 0 0.55rem; border-bottom: 1px solid #d4d4d8; border-left: 3px solid #e10600; padding: 0 0 0.3rem 0.5rem; color: #292326; font-size: 12pt; }
+.report-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.45rem; }
+.report-metrics > div { border: 1px solid #e4e4e7; border-top: 2px solid #e10600; border-radius: 0.35rem; padding: 0.45rem 0.55rem; }
+.report-metrics span, .report-metrics strong { display: block; }
+.report-metrics span { color: #62606a; font-size: 8pt; }
+.report-metrics strong { margin-top: 0.2rem; font-size: 10pt; }
+.report-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.3rem 1rem; margin: 0; }
+.report-facts > div { display: flex; justify-content: space-between; gap: 0.75rem; border-bottom: 1px solid #e4e4e7; padding: 0.22rem 0; }
+.report-facts dt { color: #52525b; }
+.report-facts dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.report-table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+.report-table thead { display: table-header-group; }
+.report-table th, .report-table td { border-bottom: 1px solid #e4e4e7; padding: 0.3rem 0.35rem; text-align: left; vertical-align: top; }
+.report-table th { border-bottom: 2px solid #e10600; background: #fff6cc; color: #302721; font-weight: 700; }
+.report-table tbody tr:nth-child(even) td { background: #fffdf5; }
+.report-table tr { break-inside: avoid; }
+.report-table .numeric { text-align: right; white-space: nowrap; }
+.report-constraint-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.25rem 1rem; margin: 0; padding: 0; list-style: none; }
+.report-constraint-list li { display: flex; align-items: baseline; gap: 0.5rem; border-bottom: 1px solid #e4e4e7; padding: 0.22rem 0; }
+.report-violations { margin-top: 0.7rem; }
+.report-check-pass, .report-check-fail, .report-check-na, .report-check-unknown { flex: none; border: 1px solid currentColor; border-radius: 999px; padding: 0.05rem 0.35rem; font-family: monospace; font-size: 7pt; font-weight: 700; }
+.report-check-pass { color: #12632f; }
+.report-check-fail { color: #b91c1c; }
+.report-check-na { color: #815d00; }
+.report-check-unknown { color: #62606a; }
+.report-muted { margin-left: auto; color: #71717a; font-size: 8pt; }
+.report-provenance { grid-template-columns: 1fr; }
+.report-footer { margin-top: 1.4rem; border-top: 2px solid #e10600; padding-top: 0.55rem; color: #52525b; font-size: 8pt; }
+
+@media print {
+  @page { size: A4; margin: 12mm; }
+  html, body { background: #fff !important; color: #18181b !important; }
+  body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .screen-only { display: none !important; }
+  .print-only-report { display: block !important; }
+  .report-sheet { max-width: none; margin: 0; padding: 0; box-shadow: none; }
+  .report-section { break-inside: auto; }
+  .report-section h2 { break-after: avoid; }
 }
 
 @media (prefers-reduced-motion: reduce) {

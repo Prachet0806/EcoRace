@@ -16,13 +16,6 @@ afterEach(() => {
 });
 
 describe("api-client contract", () => {
-  it("GETs the circuit library", async () => {
-    const mock = mockFetchOnce(200, { circuits: [], count: 0, dataset_version: "v" });
-    const out = await api.circuits();
-    expect(mock).toHaveBeenCalledWith("http://localhost:8000/api/v1/circuits", expect.anything());
-    expect(out.count).toBe(0);
-  });
-
   it("POSTs runs with the frozen DTO shape", async () => {
     const mock = mockFetchOnce(200, { run_id: "run_x" });
     await api.createRun({ race_count: 20, circuit_ids: ["a"], season_year: 2026 });
@@ -37,14 +30,5 @@ describe("api-client contract", () => {
     const err = await api.createRun({ race_count: 22, circuit_ids: ["a"], season_year: 2026 }).catch((e) => e);
     expect(err).toBeInstanceOf(EcoRaceApiError);
     expect((err as EcoRaceApiError).code).toBe("INSUFFICIENT_CIRCUITS");
-  });
-
-  it("GETs a run by id", async () => {
-    const mock = mockFetchOnce(200, { run_id: "run_1" });
-    await api.getRun("run_1");
-    expect(mock).toHaveBeenCalledWith(
-      "http://localhost:8000/api/v1/optimization/runs/run_1",
-      expect.anything(),
-    );
   });
 });

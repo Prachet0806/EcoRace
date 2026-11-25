@@ -10,6 +10,19 @@ interface Props {
   hovered: HoverTarget;
 }
 
+function applyHighlightFilters(map: maplibregl.Map, segmentIds: string[], raceIds: string[]) {
+  if (map.getLayer("route-hi")) {
+    map.setFilter("route-hi", segmentIds.length
+      ? ["in", ["get", "segment_id"], ["literal", segmentIds]]
+      : ["==", ["get", "segment_id"], ""]);
+  }
+  if (map.getLayer("race-hi")) {
+    map.setFilter("race-hi", raceIds.length
+      ? ["in", ["get", "race_id"], ["literal", raceIds]]
+      : ["==", ["get", "race_id"], ""]);
+  }
+}
+
 // Interactive route map (P0-10/11): consumes API races/segments only.
 // Great-circle arcs; hover sync via race_id/segment_id with timeline + legs.
 // Loaded with ssr:false (WebGL needs window).
@@ -17,6 +30,7 @@ export function RouteMap({ run, hovered }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  const highlightRef = useRef({ segmentIds: [] as string[], raceIds: [] as string[] });
 
   const points = useMemo(
     () => ({
@@ -89,6 +103,7 @@ export function RouteMap({ run, hovered }: Props) {
         layout: { "text-field": ["get", "seq"], "text-size": 9, "text-offset": [0, -1.2] },
         paint: { "text-color": "#f5f5f4", "text-halo-color": "#0a0a0b", "text-halo-width": 1 },
       });
+      applyHighlightFilters(map!, highlightRef.current.segmentIds, highlightRef.current.raceIds);
       const bounds = new maplibregl.LngLatBounds();
       for (const f of points.features) bounds.extend(f.geometry.coordinates);
       map!.fitBounds(bounds, { padding: 40 });
@@ -99,17 +114,20 @@ export function RouteMap({ run, hovered }: Props) {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    highlightRef.current = { segmentIds: highlightSegmentIds, raceIds: highlightRaceIds };
+  }, [highlightSegmentIds, highlightRaceIds]);
+
   // NOTE: the page keys this component by run_id, so sources are built fresh
   // per run in the onload handler above; no setData refresh needed.
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    map.setFilter("route-hi", highlightSegmentIds.length ? ["in", ["get", "segment_id"], ["literal", highlightSegmentIds]] : ["==", ["get", "segment_id"], ""]);
-    map.setFilter("race-hi", highlightRaceIds.length ? ["in", ["get", "race_id"], ["literal", highlightRaceIds]] : ["==", ["get", "race_id"], ""]);
+    applyHighlightFilters(map, highlightSegmentIds, highlightRaceIds);
   }, [highlightSegmentIds, highlightRaceIds]);
 
-  if (failed) return <p role="alert" className="rounded border border-rosso bg-card p-3 text-sm">Map unavailable: {failed}</p>;
+  if (failed) return <p role="alert" className="rounded-lg border border-rosso-ink/40 bg-card p-4 text-sm text-rosso-ink">Map unavailable: {failed}</p>;
 
-  return <div ref={containerRef} aria-label="Route map" className="h-[480px] w-full rounded-lg border border-hairline" />;
+  return <div ref={containerRef} aria-label="Route map" className="h-96 w-full rounded-xl border border-hairline md:h-[560px]" />;
 }

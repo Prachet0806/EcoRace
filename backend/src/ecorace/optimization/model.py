@@ -36,6 +36,8 @@ class SolverConfig:
     )
     use_hint: bool = True
     presolve: bool = False
+    first_attempt_presolve: bool = True
+    diagnostics_enabled: bool = False
 
 
 @dataclass(frozen=True)
@@ -64,8 +66,10 @@ class SolverMetadata:
     time_limit_s: float
     status: SolveStatus
     objective_km: float | None = None
+    shortest_candidate_km: float | None = None
     optimality_proven: bool = False
     data_version: str = "unknown"
+    diagnostics: dict = field(default_factory=dict, compare=False)
 
 
 @dataclass(frozen=True)

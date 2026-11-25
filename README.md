@@ -34,7 +34,7 @@ backend/src/ecorace/   FastAPI + domain + optimization core
   optimization/         solver pipeline: result = optimize(problem)
   application/          scenario/run orchestration (no HTTP/SQL)
   interface/http/       routes, DTOs, error envelope
-  infrastructure/       JSON reference-data loader and SQLite storage
+  infrastructure/       JSON reference-data loader
 backend/tests/          pytest suite and benchmark harnesses
 frontend/src/           Next.js (App Router) + Tailwind + zustand + MapLibre
   app/                   builder page (`page.tsx` at root)
@@ -79,7 +79,7 @@ See **[QUICKSTART.md](QUICKSTART.md)** — backend + frontend up in ~5 minutes.
 - Horizon: first Fri–Sun on/after Mar 1 → first Friday whose Sunday covers
   Dec 1 (40 weekends for 2025/2026); weekend ID = Friday date.
 - Exact-match MVP: `len(circuit_ids) == race_count` (20–24).
-- Streak limit configurable `max_consecutive` 2–7 (default 3), enforced with
+- Streak limit configurable `max_consecutive` 2–4 (default 3), enforced with
   a mandatory break after a full run.
 - Optional summer-break window (0-based weekend indices) excludes weekends
   from scheduling; the finale pin fixes the last race to the final horizon
@@ -94,9 +94,8 @@ See **[QUICKSTART.md](QUICKSTART.md)** — backend + frontend up in ~5 minutes.
   incumbents are marked `feasible_timeout`, never presented as optimal.
 - Errors use `{error: {code, message, details}}` with stable codes
   (`INSUFFICIENT_CIRCUITS`, `SCENARIO_INFEASIBLE`, `SOLVER_TIMEOUT`, …).
-- The anonymous API exposes run creation and lookup by opaque ID; public
-  history/deletion endpoints are disabled. SQLite retains runs on a persistent
-  volume; the supplied Render blueprint uses ephemeral storage.
+- **Stateless backend architecture**: Optimization is synchronous (`POST /api/v1/optimization/runs`) and returns the complete result payload directly. There is no server-side result history or API idempotency; runs are kept in browser session storage and React state for the active tab. Existing results from prior database-backed deployments are not migrated or available through this API. Download result JSON for durable retention.
+- The API enforces process-local in-memory sliding-window rate limiting and an admission-controlled solver concurrency pool with circuit-breaker protection.
 - A baseline that violates hard rules is shown as a reference only, with no
   savings claim. Run provenance records scenario choices and weather policy.
 
@@ -105,5 +104,5 @@ Historical phase-gate reports describe earlier snapshots; this README and
 
 ## Version pins
 
-Python 3.11.9 · Node 22 · Next 16.3.5 · FastAPI 0.128.2 · OR-Tools 9.15.6755 ·
+Python 3.12.10 · Node 22 · Next 16.3.5 · FastAPI 0.128.2 · OR-Tools 9.15.6755 ·
 zustand 5.0.15 · maplibre-gl 6.10.0. Full list: `docs/VERSIONS.md`.

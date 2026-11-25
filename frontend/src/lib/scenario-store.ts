@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { OptimizeStatus } from "./types";
+import type { OptimizeStatus, RunPayload } from "./types";
 
 // ADR-FE-003: single source of truth for the scenario draft.
 // Available/selected track lists are DERIVED from canonical circuits +
@@ -10,7 +10,7 @@ import type { OptimizeStatus } from "./types";
 export const MIN_RACES = 20;
 export const MAX_RACES = 24;
 export const MIN_STREAK = 2;
-export const MAX_STREAK_LIMIT = 7;
+export const MAX_STREAK_LIMIT = 4;
 export const DEFAULT_STREAK_LIMIT = 3;
 export const MAX_WEEK_INDEX = 39;
 
@@ -33,6 +33,9 @@ interface ScenarioState {
   errorCode: string | null;
   errorMessage: string | null;
   lastRunId: string | null;
+  // In-memory fallback for the immediate optimization result.
+  // Guarantees results display even if sessionStorage fails, is blocked, or is full.
+  immediateResult: RunPayload | null;
   toggle: (id: string) => void;
   clear: () => void;
   replaceSelection: (ids: string[]) => void;
@@ -44,7 +47,7 @@ interface ScenarioState {
   setPinEnd: (v: boolean) => void;
   setOptimizing: () => void;
   setError: (code: string, message: string) => void;
-  setDone: (runId: string) => void;
+  setDone: (runId: string, result?: RunPayload) => void;
   resetStatus: () => void;
 }
 
@@ -68,6 +71,7 @@ export const useScenarioStore = create<ScenarioState>()(
       errorCode: null,
       errorMessage: null,
       lastRunId: null,
+      immediateResult: null,
       toggle: (id) =>
         set((s) => ({
           selectedTrackIds: s.selectedTrackIds.includes(id)
@@ -101,7 +105,7 @@ export const useScenarioStore = create<ScenarioState>()(
       setSeasonYear: (y) => set({ seasonYear: y, status: "idle", errorCode: null, errorMessage: null }),
       setOptimizing: () => set({ status: "optimizing", errorCode: null, errorMessage: null }),
       setError: (code, message) => set({ status: "error", errorCode: code, errorMessage: message }),
-      setDone: (runId) => set({ status: "idle", lastRunId: runId }),
+      setDone: (runId, result) => set({ status: "idle", lastRunId: runId, immediateResult: result ?? null }),
       resetStatus: () => set({ status: "idle", errorCode: null, errorMessage: null }),
     }),
     { name: "ecorace-scenario", partialize: (s) => ({ selectedTrackIds: s.selectedTrackIds, raceCount: s.raceCount, seasonYear: s.seasonYear, calendarSource: s.calendarSource, maxConsecutive: s.maxConsecutive, summerBreak: s.summerBreak, pinEnd: s.pinEnd }) as ScenarioState },

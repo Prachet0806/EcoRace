@@ -1,12 +1,18 @@
 import { expect, test } from "@playwright/test";
 
+test("frontend health endpoint responds", async ({ request }) => {
+  const response = await request.get("/api/health");
+  expect(response.ok()).toBe(true);
+  expect(await response.json()).toEqual({ status: "ok", service: "ecorace-frontend" });
+});
+
 // Full MVP loop against the real API (SOLVER_TIMEOUT_SECONDS=9 in e2e env).
 // Covers: gating, select → optimize → inspect (incl. map) → back with draft
 // preserved → modify → rerun, plus keyboard activation.
 
 test("optimize button is gated until exact-match selection", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "→ Run optimization" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Run optimization" })).toBeDisabled();
   await expect(
     page.getByRole("region", { name: "Optimization command" }).getByText("Select 20 more tracks (0/20)."),
   ).toBeVisible();
@@ -69,14 +75,14 @@ test("status rail and preview track the selection", async ({ page }) => {
   }
   await expect(page.getByText("Selected (20)")).toBeVisible();
 
-  const optimize = page.getByRole("button", { name: "→ Run optimization" });
+  const optimize = page.getByRole("button", { name: "Run optimization" });
   await expect(optimize).toBeEnabled();
   await optimize.click();
 
   // Solve takes ~10-12s at the e2e budget; wait for results navigation.
   await expect(page).toHaveURL(/\/results\/run_/, { timeout: 120_000 });
   const firstRunId = page.url().split("/").pop()!;
-  await expect(page.getByRole("heading", { name: "Optimized calendar" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Optimized 2026 calendar/ })).toBeVisible();
   await expect(page.getByText("Total distance")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Calendar", exact: true })).toBeVisible();
   await expect(page.getByText(/Travel legs \(19\)/)).toBeVisible();
@@ -93,11 +99,13 @@ test("status rail and preview track the selection", async ({ page }) => {
   await expect(page.getByText("Selected (19)")).toBeVisible();
   await page.getByRole("button", { name: /^Select / }).first().click();
   await expect(page.getByText("Selected (20)")).toBeVisible();
-  await page.getByRole("button", { name: "→ Run optimization" }).click();
+  await page.getByRole("button", { name: "Run optimization" }).click();
   await expect(page).toHaveURL(/\/results\/run_/, { timeout: 120_000 });
   const secondRunId = page.url().split("/").pop()!;
   expect(secondRunId).not.toBe(firstRunId);
   await expect(page.getByRole("heading", { name: "Calendar", exact: true })).toBeVisible();
+  await page.getByLabel("Compare with a previous run from this browser").selectOption(firstRunId);
+  await expect(page.getByRole("region", { name: "Plan comparison" })).toContainText("Previous plan");
 });
 
 test("official venue set loads the 24-race preset without auto-running", async ({ page }) => {
@@ -117,6 +125,7 @@ test("official venue set loads the 24-race preset without auto-running", async (
   // Switching back to Custom resets to an empty draft.
   await page.getByRole("button", { name: /Custom calendar/ }).click();
   await expect(page.getByText("Selected (0)").first()).toBeVisible();
+  await expect(page.getByRole("group", { name: "Race count" })).toContainText("20");
   await expect(page).not.toHaveURL(/\/results\/run_/);
-  await expect(page.getByRole("button", { name: "→ Run optimization" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Run optimization" })).toBeDisabled();
 });

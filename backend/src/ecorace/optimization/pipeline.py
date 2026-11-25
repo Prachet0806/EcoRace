@@ -29,6 +29,7 @@ from ecorace.optimization.model import (
     order_distance_km,
 )
 from ecorace.optimization.ortools_solver import ORToolsSolver
+from ecorace.optimization.quality import route_quality
 from ecorace.optimization.validator import SolutionValidator
 
 
@@ -125,10 +126,13 @@ def _baseline_km(problem: OptimizationProblem) -> tuple[float | None, str]:
 def optimize(
     problem: OptimizationProblem, config: SolverConfig = SolverConfig()
 ) -> OptimizationResult:
+    pipeline_started = time.perf_counter()
     baseline_cal, baseline_km, baseline_status = _baseline_calendar(problem)
+    baseline_finished = time.perf_counter()
 
     h_cal, h_meta = None, None
     h_out = HeuristicSolver().solve(problem, config)
+    heuristic_finished = time.perf_counter()
     if h_out[0] is not None:
         h_cal, _ = h_out[0]
         h_meta = h_out[1]
@@ -146,6 +150,7 @@ def optimize(
         )
         else None
     )
+    hint_checked = time.perf_counter()
 
     o_cal, o_meta, last_meta = None, None, None
     attempts: list[dict] = []
@@ -172,18 +177,21 @@ def optimize(
             ),
             num_workers=config.num_workers,
             use_hint=config.use_hint,
-            # First seed solves WITH presolve: locks the clean hint almost
-            # instantly (safety net). Remaining seeds solve WITHOUT presolve:
-            # slower first solution, stronger improvement. Keep-best decides.
-            # (Measured V1.1 against the monthly-minimum encoding.)
-            presolve=(idx == 0),
+            # The API can compare the first attempt with presolve on or off.
+            # Direct multi-seed runs retain the historical mixed portfolio.
+            presolve=(idx == 0 and config.first_attempt_presolve),
+            first_attempt_presolve=config.first_attempt_presolve,
+            diagnostics_enabled=config.diagnostics_enabled,
         )
         cal_s, meta_s = ORToolsSolver().solve(problem, seed_cfg, hint_calendar=hint_cal)
         last_meta = meta_s
         km_s = None
-        if cal_s is not None and not SolutionValidator.validate(
+        validation_started = time.perf_counter()
+        valid = cal_s is not None and not SolutionValidator.validate(
             cal_s, problem.scenario, problem.weekends, problem.weather
-        ):
+        )
+        candidate_validation_ms = int((time.perf_counter() - validation_started) * 1000)
+        if valid:
             km_s = order_distance_km(race_order(cal_s), problem.circuits)
             if km_s < best_km:
                 best_km, o_cal, o_meta = km_s, cal_s, meta_s
@@ -192,8 +200,10 @@ def optimize(
                 "seed": s,
                 "status": meta_s.status.value,
                 "km": km_s,
-                "time_limit_s": seed_cfg.time_limit_s,
+                "time_limit_s": meta_s.time_limit_s,
                 "runtime_ms": meta_s.runtime_ms,
+                "candidate_validation_ms": candidate_validation_ms,
+                **meta_s.diagnostics,
             }
         )
     if o_meta is None:
@@ -213,16 +223,18 @@ def optimize(
         "baseline_status": baseline_status,
         "solver_disagreement": False,
         "attempts": attempts,
+        "timing_ms": {
+            "baseline": int((baseline_finished - pipeline_started) * 1000),
+            "heuristic": int((heuristic_finished - baseline_finished) * 1000),
+            "hint_validation": int((hint_checked - heuristic_finished) * 1000),
+        },
     }
 
-    # Best validator-clean calendar wins, regardless of origin. Never prefer a
-    # worse solver solution over a better heuristic one (or vice versa).
-    # Guardrail: a validator-clean baseline is itself a candidate
-    # (origin="baseline"), so optimized can never regress vs a comparable
-    # baseline. A dirty baseline (usual case: monthly-minimum violation) is
-    # NOT a candidate and stays flagged non_comparable in diagnostics.
-    best: tuple[Calendar, SolverMetadata, SolveStatus, str] | None = None
-    best_km = float("inf")
+    # Select among validated candidates within 2% of the shortest route using
+    # region re-entries, long hops, and longest hop as operational tie-breakers.
+    # A validator-clean baseline also caps the selected distance so a fair
+    # baseline comparison never regresses. A dirty baseline is excluded.
+    candidates: list[tuple[Calendar, SolverMetadata, SolveStatus, str, float]] = []
     if baseline_cal is not None and baseline_status == "ok" and baseline_km is not None:
         baseline_meta = SolverMetadata(
             solver_name="baseline",
@@ -234,36 +246,54 @@ def optimize(
             objective_km=baseline_km,
             data_version=problem.data_version,
         )
-        best = (baseline_cal, baseline_meta, SolveStatus.FEASIBLE, "baseline")
-        best_km = baseline_km
+        candidates.append((baseline_cal, baseline_meta, SolveStatus.FEASIBLE, "baseline", baseline_km))
     if h_cal is not None:
         h_viol = SolutionValidator.validate(
             h_cal, problem.scenario, problem.weekends, problem.weather
         )
         if not h_viol:
             h_km = order_distance_km(race_order(h_cal), problem.circuits)
-            if h_km < best_km:
-                best = (h_cal, h_meta, SolveStatus.FEASIBLE, "heuristic")
-                best_km = h_km
+            candidates.append((h_cal, h_meta, SolveStatus.FEASIBLE, "heuristic", h_km))
     if o_cal is not None:
         o_km = order_distance_km(race_order(o_cal), problem.circuits)
-        if o_km < best_km:
-            o_status = (
-                SolveStatus.FEASIBLE_OPTIMAL
-                if o_meta.status == SolveStatus.FEASIBLE_OPTIMAL
-                else SolveStatus.FEASIBLE_TIMEOUT  # P0-08: non-optimal stays marked
-                if o_meta.status == SolveStatus.FEASIBLE_TIMEOUT
-                else SolveStatus.FEASIBLE
-            )
-            best = (o_cal, o_meta, o_status, "ortools")
-            best_km = o_km
-        elif best is not None and o_meta.status == SolveStatus.INFEASIBLE:
-            diagnostics["solver_disagreement"] = True
+        o_status = (
+            SolveStatus.FEASIBLE_OPTIMAL
+            if o_meta.status == SolveStatus.FEASIBLE_OPTIMAL
+            else SolveStatus.FEASIBLE_TIMEOUT
+            if o_meta.status == SolveStatus.FEASIBLE_TIMEOUT
+            else SolveStatus.FEASIBLE
+        )
+        candidates.append((o_cal, o_meta, o_status, "ortools", o_km))
 
-    if best is not None:
-        cal, meta, status, origin = best
+    if candidates:
+        shortest_km = min(
+            [candidate[4] for candidate in candidates]
+            + ([h_meta.shortest_candidate_km] if h_meta is not None and h_meta.shortest_candidate_km is not None else [])
+        )
+        eligible = [
+            candidate for candidate in candidates
+            if candidate[4] <= shortest_km * 1.02
+            and (baseline_status != "ok" or baseline_km is None or candidate[4] <= baseline_km + 1e-6)
+        ]
+        def practical_rank(candidate):
+            measures = route_quality(race_order(candidate[0]), problem.circuits)
+            return (
+                measures["region_backtracks"],
+                measures["hops_over_5000_km"],
+                measures["longest_hop_km"],
+                candidate[4],
+            )
+        cal, meta, status, origin, selected_km = min(eligible, key=practical_rank)
+        diagnostics["quality_selection"] = {
+            "shortest_candidate_km": round(shortest_km, 2),
+            "selected_extra_distance_pct": round((selected_km / shortest_km - 1) * 100, 2),
+            **route_quality(race_order(cal), problem.circuits),
+        }
         diagnostics["solver_disagreement"] = any(
             a["status"] == SolveStatus.INFEASIBLE.value for a in attempts
+        )
+        diagnostics["timing_ms"]["pipeline_total"] = int(
+            (time.perf_counter() - pipeline_started) * 1000
         )
         return OptimizationResult(
             status=status,
@@ -281,6 +311,9 @@ def optimize(
         status = SolveStatus.SOLVER_TIMEOUT
     else:
         status = SolveStatus.SOLVER_FAILURE
+    diagnostics["timing_ms"]["pipeline_total"] = int(
+        (time.perf_counter() - pipeline_started) * 1000
+    )
     return OptimizationResult(
         status=status,
         calendar=None,

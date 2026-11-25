@@ -95,6 +95,10 @@ export interface RunPayload {
     baseline_distance_km: number | null;
     saving_km: number | null;
     baseline_status: string;
+    longest_hop_km?: number;
+    hops_over_5000_km?: number;
+    region_changes?: number;
+    region_backtracks?: number;
   };
   constraints: ConstraintStatus[];
   solver: {
@@ -123,8 +127,37 @@ export interface RunPayload {
     };
     requested_budget_s: number;
     seed_schedule: number[];
-    attempts: Array<{ seed: number; status: string; km: number | null; time_limit_s: number; runtime_ms: number }>;
+    attempts: Array<{
+      seed: number;
+      status: string;
+      km: number | null;
+      time_limit_s: number;
+      runtime_ms: number;
+      raw_status?: string;
+      trace_id?: string;
+      presolve?: boolean;
+      num_workers?: number;
+      hint_supplied?: boolean;
+      model_build_ms?: number;
+      solver_limit_s?: number;
+      solver_wall_ms?: number;
+      first_solution_ms?: number | null;
+      first_solution_km?: number | null;
+      solution_count?: number;
+      search_started?: boolean | null;
+      presearch_ms?: number | null;
+      presolve_estimate_ms?: number | null;
+    }>;
+    quality_selection?: {
+      shortest_candidate_km: number;
+      selected_extra_distance_pct: number;
+      longest_hop_km: number;
+      hops_over_5000_km: number;
+      region_changes: number;
+      region_backtracks: number;
+    } | null;
     total_runtime_ms: number;
+    timing_ms?: Record<string, number>;
   } | null;
 }
 

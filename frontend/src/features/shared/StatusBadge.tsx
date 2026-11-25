@@ -8,7 +8,7 @@ interface Props {
 const TONES: Record<Props["tone"], string> = {
   ready: "bg-pass/15 text-pass",
   warn: "bg-giallo/15 text-giallo",
-  error: "bg-rosso/15 text-rosso",
+  error: "bg-rosso-ink/15 text-rosso-ink",
   info: "bg-lift text-mute",
 };
 
@@ -16,6 +16,6 @@ const TONES: Record<Props["tone"], string> = {
 // giallo, error rosso — never restyle per context.
 export function StatusBadge({ tone, children }: Props) {
   return (
-    <span className={`rounded px-1.5 py-0.5 font-tel text-xs font-semibold ${TONES[tone]}`}>{children}</span>
+    <span className={`rounded-md px-2 py-1 font-tel text-xs font-medium ${TONES[tone]}`}>{children}</span>
   );
 }

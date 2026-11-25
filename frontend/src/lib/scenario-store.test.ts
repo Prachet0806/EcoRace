@@ -42,10 +42,10 @@ describe("scenario store (single source of truth)", () => {
     expect(useScenarioStore.getState().selectedTrackIds).toEqual([]);
   });
 
-  it("clamps the streak limit to 2–7", () => {
+  it("clamps the streak limit to 2–4", () => {
     const { setMaxConsecutive } = useScenarioStore.getState();
     setMaxConsecutive(99);
-    expect(useScenarioStore.getState().maxConsecutive).toBe(7);
+    expect(useScenarioStore.getState().maxConsecutive).toBe(4);
     setMaxConsecutive(0);
     expect(useScenarioStore.getState().maxConsecutive).toBe(2);
     setMaxConsecutive(2);

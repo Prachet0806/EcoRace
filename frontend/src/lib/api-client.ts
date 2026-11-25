@@ -1,5 +1,5 @@
 // ADR-FE-002: single typed FastAPI client. Components must not call fetch() directly.
-import type { ApiError, Circuit, RunPayload, SeasonSchedule } from "./types";
+import type { ApiError, RunPayload } from "./types";
 import { useToastStore } from "./useToastStore";
 
 const BASE_URL = process.env.NEXT_PUBLIC_ECORACE_API_URL ?? "http://localhost:8000";
@@ -44,8 +44,6 @@ function notifyError(error: EcoRaceApiError) {
 export const api = {
   baseUrl: BASE_URL,
   health: () => request<{ status: string; dataset_version: string }>("/api/v1/health"),
-  circuits: () => request<{ circuits: Circuit[]; count: number; dataset_version: string }>("/api/v1/circuits"),
-  seasonWeekends: (year: number) => request<SeasonSchedule>(`/api/v1/seasons/${year}/weekends`),
   createRun: (body: {
     race_count: number;
     circuit_ids: string[];
@@ -55,12 +53,10 @@ export const api = {
     summer_break_end?: number | null;
     pin_end_to_dec_week1?: boolean;
   }) =>
-    request<RunPayload>("/api/v1/optimization/runs", { method: "POST", body: JSON.stringify(body) }).catch((e) => {
+    request<RunPayload>("/api/v1/optimization/runs", {
+      method: "POST", body: JSON.stringify(body),
+    }).catch((e) => {
       if (e instanceof EcoRaceApiError) notifyError(e);
       throw e;
     }),
-  getRun: (runId: string) => request<RunPayload>(`/api/v1/optimization/runs/${runId}`).catch((e) => {
-    if (e instanceof EcoRaceApiError) notifyError(e);
-    throw e;
-  }),
 };

@@ -1,7 +1,6 @@
 "use client";
 
-// Eyebrow section label: display font, tracked, muted. Single place for the
-// workstation's information hierarchy voice.
+// Consistent, readable section title across the workstation.
 export function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <h2 className="font-display text-sm font-bold tracking-widest uppercase">{children}</h2>;
+  return <h2 className="font-display text-[16px] font-medium">{children}</h2>;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import type { RunPayload } from "@/lib/types";
+import { constraintReportState } from "@/features/results/constraintSummary";
 
 const LABELS: Record<string, string> = {
   weather: "Synthetic weather policy feasibility",
@@ -11,7 +12,7 @@ const LABELS: Record<string, string> = {
   race_count_unique: "Race count & uniqueness",
 };
 
-function detailFor(name: string, run: RunPayload): string {
+function detailFor(name: string, run: RunPayload, state: ReturnType<typeof constraintReportState>): string {
   const n = run.calendar.race_count;
   switch (name) {
     case "weather":
@@ -19,10 +20,14 @@ function detailFor(name: string, run: RunPayload): string {
     case "max_consecutive":
       return `Maximum observed streak: ${run.calendar.max_streak}`;
     case "summer_break":
+      if (state === "NOT APPLICABLE") return "Not configured for this run";
+      if (state === "NOT RECORDED") return "Scenario setting not recorded";
       return "No races inside the break window";
     case "monthly_minimum":
       return "At least one race per month";
     case "dec_end_pin":
+      if (state === "NOT APPLICABLE") return "Not configured for this run";
+      if (state === "NOT RECORDED") return "Scenario setting not recorded";
       return "Finale on the final planning weekend";
     case "race_count_unique":
       return `${n} / ${n} unique`;
@@ -33,39 +38,47 @@ function detailFor(name: string, run: RunPayload): string {
 
 export function ConstraintDiagnostics({ run }: { run: RunPayload }) {
   return (
-    <section aria-label="Constraint diagnostics" className="rounded-lg border border-hairline bg-card p-3">
-      <h2 className="mb-2 font-display text-sm font-bold tracking-widest uppercase">Constraint check</h2>
+    <section aria-label="Constraint diagnostics" className="rounded-xl border border-hairline bg-card p-4">
+      <h2 className="mb-3 font-display text-[16px] font-medium">Constraint check</h2>
       <ul className="space-y-2 text-sm">
-        {run.constraints.map((c) => (
-          <li key={c.name}>
-            <div className="flex flex-wrap items-center gap-2">
-              <span
-                aria-label={c.satisfied ? "satisfied" : "violated"}
-                className={`rounded px-1.5 py-0.5 font-tel text-xs font-semibold ${
-                  c.satisfied ? "bg-pass/15 text-pass" : "bg-rosso/15 text-rosso"
-                }`}
-              >
-                {c.satisfied ? "PASS" : "FAIL"}
-              </span>
-              <span className="font-medium">{LABELS[c.name] ?? c.name}</span>
-              <span className="font-tel text-xs text-mute">{detailFor(c.name, run)}</span>
-            </div>
-            {!c.satisfied && (
-              <ul className="ml-6 mt-1 list-disc text-mute">
-                {c.violations.map((v, i) => (
-                  <li key={i}>
-                    <span className="font-tel">{v.code}</span>: {v.message}
-                    {v.circuit_id && v.weekend_id && (
-                      <span className="block font-tel text-xs">
-                        Affected assignment: {v.circuit_id} → {v.weekend_id}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
-        ))}
+        {run.constraints.map((c) => {
+          const state = constraintReportState(c, run);
+          const isNotApplicable = state === "NOT APPLICABLE";
+          const isUnknown = state === "NOT RECORDED";
+          const passed = state === "PASS";
+          const label = isNotApplicable ? "N/A" : isUnknown ? "UNKNOWN" : passed ? "PASS" : "FAIL";
+          const badgeTone = isNotApplicable || isUnknown
+            ? "bg-base text-mute"
+            : passed ? "bg-pass/15 text-pass" : "bg-rosso-ink/15 text-rosso-ink";
+          return (
+            <li key={c.name}>
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  aria-label={isNotApplicable ? "not applicable" : isUnknown ? "not recorded" : passed ? "satisfied" : "violated"}
+                  className={`rounded px-1.5 py-0.5 font-tel text-xs font-semibold ${badgeTone}`}
+                >
+                  {label}
+                </span>
+                <span className="font-medium">{LABELS[c.name] ?? c.name}</span>
+                <span className="font-tel text-xs text-mute">{detailFor(c.name, run, state)}</span>
+              </div>
+              {state === "REVIEW" && (
+                <ul className="ml-6 mt-1 list-disc text-mute">
+                  {c.violations.map((v, i) => (
+                    <li key={i}>
+                      <span className="font-tel">{v.code}</span>: {v.message}
+                      {v.circuit_id && v.weekend_id && (
+                        <span className="block font-tel text-xs">
+                          Affected assignment: {v.circuit_id} → {v.weekend_id}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

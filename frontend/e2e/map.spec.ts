@@ -6,7 +6,7 @@ test("map fully loads with route layers", async ({ page }) => {
   for (let i = 0; i < 20; i++) {
     await addButtons.nth(i).click();
   }
-  await page.getByRole("button", { name: "→ Run optimization" }).click();
+  await page.getByRole("button", { name: "Run optimization" }).click();
   await expect(page).toHaveURL(/\/results\/run_/, { timeout: 120_000 });
   // Canvas alone is not enough (a stalled map still paints a canvas):
   // require the style/tiles fully loaded signal.

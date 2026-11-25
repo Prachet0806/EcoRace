@@ -1,8 +1,7 @@
 interface Props {
-  wide?: boolean;
   children: React.ReactNode;
 }
 
-export function PageContainer({ wide = false, children }: Props) {
-  return <main className={`mx-auto space-y-4 bg-base p-4 text-ink ${wide ? "max-w-6xl" : "max-w-5xl"}`}>{children}</main>;
+export function PageContainer({ children }: Props) {
+  return <main className="mx-auto w-full max-w-[1440px] flex-1 space-y-6 px-4 py-6 text-ink sm:px-6 lg:px-8">{children}</main>;
 }

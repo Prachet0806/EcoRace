@@ -21,7 +21,7 @@ test("visual artifacts: results + missing", async ({ page }) => {
   for (let i = 0; i < 20; i++) {
     await addButtons.nth(i).click();
   }
-  await page.getByRole("button", { name: "→ Run optimization" }).click();
+  await page.getByRole("button", { name: "Run optimization" }).click();
   await expect(page).toHaveURL(/\/results\/run_/, { timeout: 120_000 });
   await expect(page.locator('[aria-label="Route map"][data-map-loaded="true"]')).toBeVisible({ timeout: 60_000 });
   await page.screenshot({ path: "test-results/shot-results.png" });

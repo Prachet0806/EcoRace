@@ -38,8 +38,8 @@ export function TrackWorkspace({ circuits, selectedIds, seasonYear, locked, onTo
             role="tab"
             aria-selected={tab === t}
             onClick={() => setTab(t)}
-            className={`rounded border px-2 py-1 font-tel text-xs tracking-widest uppercase transition-colors ${
-              tab === t ? "border-rosso bg-rosso/15 text-ink" : "border-hairline text-mute"
+            className={`min-h-10 rounded-lg border px-3 py-2 text-sm transition-colors ${
+              tab === t ? "border-hairline bg-lift text-ink" : "border-hairline text-mute"
             }`}
           >
             {t === "selected" ? "Your calendar" : "Available"}

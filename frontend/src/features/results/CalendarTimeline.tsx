@@ -62,13 +62,13 @@ export function CalendarTimeline({ run, hovered, onHover }: Props) {
   const races = new Map(run.calendar.races.map((r) => [r.race_id, r]));
 
   return (
-    <section aria-label="Optimized calendar" className="rounded-lg border border-hairline bg-card p-3">
-      <h2 className="mb-2 font-display text-sm font-bold tracking-widest uppercase">Calendar</h2>
+    <section aria-label="Optimized calendar" className="rounded-xl border border-hairline bg-card p-4">
+      <h2 className="mb-3 font-display text-[16px] font-medium">Calendar</h2>
       <ol className="max-h-[480px] space-y-1 overflow-y-auto">
         {rows.map((row) => {
           if (row.kind === "month") {
             return (
-              <li key={row.key} aria-hidden="true" className="pt-2 font-tel text-xs tracking-widest text-mute uppercase">
+              <li key={row.key} aria-hidden="true" className="pt-3 font-tel text-xs text-mute">
                 {row.month}
               </li>
             );
@@ -77,10 +77,10 @@ export function CalendarTimeline({ run, hovered, onHover }: Props) {
             return (
               <li
                 key={row.key}
-                className="border-y border-hairline px-2 py-1 text-center font-tel text-xs tracking-widest text-mute"
+                className="border-y border-hairline px-2 py-2 text-center font-tel text-xs text-mute"
                 aria-label={`${row.gapCount} break weekends`}
               >
-                — BREAK × {row.gapCount} —
+                {row.gapCount} break {row.gapCount === 1 ? "weekend" : "weekends"}
               </li>
             );
           }
@@ -91,13 +91,13 @@ export function CalendarTimeline({ run, hovered, onHover }: Props) {
               key={r.race_id}
               onMouseEnter={() => onHover({ kind: "race", id: r.race_id })}
               onMouseLeave={() => onHover(null)}
-              className={`flex items-center gap-2 rounded px-2 py-1 text-sm transition-colors ${
-                active ? "bg-rosso text-white" : "hover:bg-lift"
+              className={`flex min-h-10 items-center gap-2 rounded-lg px-2 py-1 text-sm transition-colors ${
+                active ? "bg-lift" : "hover:bg-lift"
               }`}
             >
               <span
                 className={`w-12 shrink-0 rounded px-1 py-0.5 text-center font-tel text-xs font-semibold ${
-                  active ? "bg-white/20 text-white" : "bg-giallo text-black"
+                  active ? "bg-rosso text-white" : "bg-lift text-ink"
                 }`}
               >
                 {r.race_id.replace("race-", "R")}

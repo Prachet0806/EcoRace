@@ -51,7 +51,10 @@ def test_api_determinism_same_seed_same_result():
     payload = {"race_count": 20, "circuit_ids": IDS[:20], "seed": 7, "budget_s": 6.0}
     a = client.post("/api/v1/optimization/runs", json=payload).json()
     b = client.post("/api/v1/optimization/runs", json=payload).json()
-    assert a["provenance"]["seed_schedule"] == [7, 8, 9]
+    assert a["provenance"]["seed_schedule"] == [7]
+    assert len(a["provenance"]["attempts"]) == 1
+    assert a["provenance"]["attempts"][0]["seed"] == 7
+    assert a["provenance"]["attempts"][0]["time_limit_s"] <= 6.0
     assert a["metrics"]["total_distance_km"] == b["metrics"]["total_distance_km"]
     assert [r["circuit_id"] for r in a["calendar"]["races"]] == [
         r["circuit_id"] for r in b["calendar"]["races"]

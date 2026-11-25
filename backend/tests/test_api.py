@@ -1,21 +1,52 @@
-"""P2 gate: HTTP integration, stable error codes, response contracts, CORS."""
+"""HTTP integration tests: stable error codes, response contracts, CORS.
+
+Pilot architecture: stateless. The POST /optimization/runs endpoint returns the
+complete result synchronously. There is no database, no idempotency, and no
+result-retrieval endpoint. All assertions are made on the direct POST response.
+"""
+
+import uuid
 
 from ecorace.application import optimization_service as svc
-from ecorace.infrastructure import data_loader, persistence
 from ecorace.interface.http.app import create_app
 from fastapi.testclient import TestClient
 
 app = create_app()
 client = TestClient(app)
 
+from ecorace.infrastructure import data_loader
+
 IDS = [c["id"] for c in data_loader.circuit_list_sorted()]
+
+
+# ---------------------------------------------------------------------------
+# Health and reference data
+# ---------------------------------------------------------------------------
 
 
 def test_health():
     r = client.get("/api/v1/health")
     assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "ok"
+    assert "dataset_version" in body
+    # Health contains operational status, not persistence status.
+    assert "database" not in body
+
+
+def test_health_liveness_probe():
+    """Root /health liveness probe is available."""
+    r = client.get("/health")
+    assert r.status_code == 200
     assert r.json()["status"] == "ok"
-    assert "dataset_version" in r.json()
+
+
+def test_health_diagnostic_fields():
+    """Diagnostic health includes solver circuit-breaker state."""
+    body = client.get("/api/v1/health").json()
+    assert "solver" in body
+    assert "circuit_breaker_open" in body["solver"]
+    assert "consecutive_failures" in body["solver"]
 
 
 def test_circuits_sorted_and_versioned():
@@ -33,11 +64,14 @@ def test_circuits_expose_venue_provenance():
     # silently breaks it, so pin them at the API level.
     body = client.get("/api/v1/circuits").json()
     for c in body["circuits"]:
-        assert (
-            "f1_current_2026" in c and "f1_hosted_seasons" in c and "venue_source" in c
-        )
+        assert "f1_current_2026" in c and "f1_hosted_seasons" in c and "venue_source" in c
     official = [c["id"] for c in body["circuits"] if c["f1_current_2026"] is True]
     assert len(official) == 24
+
+
+# ---------------------------------------------------------------------------
+# Scenario (in-memory, no persistence writes)
+# ---------------------------------------------------------------------------
 
 
 def test_create_scenario_ok():
@@ -53,12 +87,11 @@ def test_create_scenario_ok():
     assert body["scenario_id"].startswith("scn_")
     assert body["weekend_count"] == 40
     assert body["horizon"] == {"start": "2026-03-06", "end": "2026-12-04"}
-    stored = persistence.get_scenario(body["scenario_id"])
-    assert stored is not None
-    assert stored["config_complete"] is True
-    assert stored["max_consecutive"] == 2
-    assert (stored["summer_break_start"], stored["summer_break_end"]) == (19, 21)
-    assert stored["pin_end_to_dec_week1"] is True
+    assert body["max_consecutive"] == 2
+    assert body["summer_break_start"] == 19
+    assert body["summer_break_end"] == 21
+    assert body["pin_end_to_dec_week1"] is True
+    # Validate the returned dict directly; no stored row exists.
 
 
 def test_scenario_error_codes():
@@ -104,17 +137,24 @@ def test_scenario_error_codes():
         assert r.json()["error"]["code"] == code, (payload, r.json())
 
 
-def _run_once() -> str:
+# ---------------------------------------------------------------------------
+# Optimization: response contract (synchronous, self-contained result)
+# ---------------------------------------------------------------------------
+
+
+def _run_once(budget_s: float = 3.0) -> dict:
+    """Submit an optimization and return the full response body."""
     r = client.post(
         "/api/v1/optimization/runs",
-        json={"race_count": 20, "circuit_ids": IDS[:20], "budget_s": 3.0},
+        json={"race_count": 20, "circuit_ids": IDS[:20], "budget_s": budget_s},
     )
     assert r.status_code == 200, r.text
-    return r.json()["run_id"]
+    return r.json()
 
 
 def test_run_happy_path_contract():
-    body = client.get(f"/api/v1/optimization/runs/{_run_once()}").json()
+    """The POST response is the complete, self-contained result."""
+    body = _run_once()
     assert body["run_id"].startswith("run_")
     assert body["status"] in ("feasible", "feasible_optimal", "feasible_timeout")
     cal = body["calendar"]
@@ -127,10 +167,7 @@ def test_run_happy_path_contract():
     assert len(body["segments"]) == 19
     assert body["segments"][0]["segment_id"] == "seg-01"
     if body["metrics"]["baseline_status"] == "ok":
-        assert (
-            body["metrics"]["total_distance_km"]
-            <= body["metrics"]["baseline_distance_km"]
-        )
+        assert body["metrics"]["total_distance_km"] <= body["metrics"]["baseline_distance_km"]
     else:
         assert body["metrics"]["saving_km"] is None
     assert all(c["satisfied"] for c in body["constraints"])
@@ -138,13 +175,47 @@ def test_run_happy_path_contract():
     assert body["data_version"] == "fia-grade1-2026-03-31+f1-2020-2026"
     assert body["provenance"]["weather_synthetic"] is True
     assert body["provenance"]["weather_sha256"]
-    assert body["provenance"]["seed_schedule"] == [0, 1, 2]
+    assert body["provenance"]["seed_schedule"] == [0]
+    assert len(body["provenance"]["attempts"]) == 1
+    assert body["provenance"]["attempts"][0]["seed"] == 0
+    assert body["provenance"]["attempts"][0]["time_limit_s"] <= 3.0
+    attempt = body["provenance"]["attempts"][0]
+    assert attempt["raw_status"] in {"OPTIMAL", "FEASIBLE", "INFEASIBLE", "UNKNOWN", "MODEL_INVALID"}
+    assert attempt["model_build_ms"] >= 0
+    assert attempt["solver_limit_s"] <= 3.0
+    assert attempt["first_solution_ms"] is None or attempt["first_solution_ms"] >= 0
+    assert body["provenance"]["timing_ms"]["heuristic"] >= 0
+    assert body["provenance"]["total_runtime_ms"] >= attempt["runtime_ms"]
     # Route geometry sanity: segment endpoints match race order.
     for seg, a, b in zip(body["segments"], cal["races"], cal["races"][1:]):
         assert (seg["from_circuit_id"], seg["to_circuit_id"]) == (
             a["circuit_id"],
             b["circuit_id"],
         )
+
+
+def test_result_contains_all_required_fields():
+    """Every field the frontend depends on must be present."""
+    body = _run_once()
+    required_top = {"run_id", "status", "calendar", "segments", "metrics", "constraints", "solver", "data_version", "provenance"}
+    assert required_top <= body.keys()
+    assert body["run_id"].startswith("run_")
+    # Calendar structure
+    cal = body["calendar"]
+    for key in ("races", "breaks", "weekend_count", "race_count", "break_count", "max_streak"):
+        assert key in cal, f"calendar.{key} missing"
+    # Provenance structure
+    prov = body["provenance"]
+    for key in ("weather_version", "weather_sha256", "circuits_sha256", "weather_synthetic",
+                "scenario", "requested_budget_s", "seed_schedule", "attempts", "total_runtime_ms"):
+        assert key in prov, f"provenance.{key} missing"
+
+
+def test_independent_validator_clears_all_constraints():
+    """Every successful result must pass the independent validator (no DB required)."""
+    body = _run_once()
+    for c in body["constraints"]:
+        assert c["satisfied"], f"Constraint {c['name']} violated in result"
 
 
 def test_run_with_knobs_contract():
@@ -195,16 +266,6 @@ def test_season_weekends_endpoint():
     assert r.json()["error"]["code"] == "INVALID_HORIZON"
 
 
-def test_run_roundtrip_and_404():
-    run_id = _run_once()
-    r = client.get(f"/api/v1/optimization/runs/{run_id}")
-    assert r.status_code == 200
-    assert r.json()["run_id"] == run_id
-    r = client.get("/api/v1/optimization/runs/run_missing")
-    assert r.status_code == 404
-    assert r.json()["error"]["code"] == "RUN_NOT_FOUND"
-
-
 def test_run_error_codes_fast():
     r = client.post(
         "/api/v1/optimization/runs", json={"race_count": 22, "circuit_ids": IDS[:20]}
@@ -224,12 +285,192 @@ def test_unsupported_request_fields_are_rejected():
         assert r.json()["error"]["code"] == "INVALID_REQUEST"
 
 
-def test_cors_allows_configured_origin():
-    r = client.get("/api/v1/health", headers={"Origin": "http://localhost:3000"})
-    assert r.headers.get("access-control-allow-origin") == "http://localhost:3000"
+# ---------------------------------------------------------------------------
+# Removed DB-backed endpoints must be absent
+# ---------------------------------------------------------------------------
+
+
+def test_result_lookup_endpoint_is_absent():
+    """Backend does not retain run history. GET /optimization/runs/{id} must not exist."""
+    body = _run_once()
+    run_id = body["run_id"]
+    # The route must return 404 (not 200 from a DB lookup).
+    r = client.get(f"/api/v1/optimization/runs/{run_id}")
+    assert r.status_code == 404
+
+    r = client.get("/api/v1/optimization/runs/run_missing")
+    assert r.status_code == 404
+
+
+def test_submission_status_endpoint_is_absent():
+    """Idempotency submission endpoint must not exist."""
+    r = client.get(f"/api/v1/optimization/submissions/{uuid.uuid4()}")
+    assert r.status_code == 404
 
 
 def test_public_history_and_delete_routes_are_absent():
     assert client.get("/api/v1/scenarios").status_code == 404
     assert client.get("/api/v1/optimization/runs").status_code == 405
     assert client.delete("/api/v1/scenarios/scn_unknown").status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Protocol infrastructure
+# ---------------------------------------------------------------------------
+
+
+def test_request_id_and_payload_limit():
+    r = client.get("/api/v1/health", headers={"X-Request-ID": "test-request-1"})
+    assert r.headers["x-request-id"] == "test-request-1"
+    r = client.get("/api/v1/health", headers={"X-Request-ID": "x" * 200})
+    assert len(r.headers["x-request-id"]) <= 64
+    r = client.post(
+        "/api/v1/optimization/runs",
+        content=b" " * 17000,
+        headers={"Content-Type": "application/json"},
+    )
+    assert r.status_code == 413
+    assert r.json()["error"]["code"] == "PAYLOAD_TOO_LARGE"
+
+
+def test_cors_allows_configured_origin():
+    r = client.get("/api/v1/health", headers={"Origin": "http://localhost:3000"})
+    assert r.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
+# ---------------------------------------------------------------------------
+# In-memory rate limiting (process-local, no DB)
+# ---------------------------------------------------------------------------
+
+
+def test_in_memory_rate_limiting_is_process_local_and_tracks_quota(monkeypatch):
+    """In-memory quotas are process-local: requests track against sliding window."""
+    monkeypatch.setenv("RATE_LIMIT_HEALTH", "1/minute")
+    # Use a unique client address to avoid colliding with other tests.
+    client_address = (f"quota-{uuid.uuid4()}", 51000)
+
+    app = create_app()
+    isolated = TestClient(app, client=client_address)
+    assert isolated.get("/api/v1/health").status_code == 200
+    # Both health routes share the same limit group.
+    limited = isolated.get("/health")
+    assert limited.status_code == 429
+    assert limited.json()["error"]["code"] == "RATE_LIMITED"
+    assert int(limited.headers["Retry-After"]) >= 1
+
+    # In the same process, a different client IP gets its own independent quota.
+    other_client = (f"quota-{uuid.uuid4()}", 51001)
+    fresh = TestClient(app, client=other_client)
+    assert fresh.get("/api/v1/health").status_code == 200
+
+
+def test_rate_limit_runs_endpoint(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT_RUNS", "1/minute")
+    unique_client = (f"quota-runs-{uuid.uuid4()}", 52000)
+    test_app = create_app()
+    tc = TestClient(test_app, client=unique_client)
+    # First request is allowed (may succeed or fail with a solver error; either is fine).
+    # We just need a non-429 response.
+    r1 = tc.post(
+        "/api/v1/optimization/runs",
+        json={"race_count": 22, "circuit_ids": IDS[:20]},  # invalid — fast 422
+    )
+    assert r1.status_code != 429
+    # Second request must be rate-limited.
+    r2 = tc.post(
+        "/api/v1/optimization/runs",
+        json={"race_count": 22, "circuit_ids": IDS[:20]},
+    )
+    assert r2.status_code == 429
+    assert r2.json()["error"]["code"] == "RATE_LIMITED"
+
+
+# ---------------------------------------------------------------------------
+# Concurrency: solver semaphore
+# ---------------------------------------------------------------------------
+
+
+def test_solver_overloaded_while_slot_occupied():
+    """While the first solver slot is held, a second request gets 503 SOLVER_OVERLOADED."""
+    import threading
+    import time
+
+    test_app = create_app()
+    tc = TestClient(test_app)
+
+    # Acquire the semaphore directly to simulate a long-running solve.
+    test_app.state.solver_slots.acquire()
+    result_codes: list[int] = []
+
+    def _request():
+        r = tc.post(
+            "/api/v1/optimization/runs",
+            json={"race_count": 20, "circuit_ids": IDS[:20], "budget_s": 1.0},
+        )
+        result_codes.append(r.status_code)
+
+    t = threading.Thread(target=_request)
+    t.start()
+    t.join(timeout=5)
+    # Release the held slot.
+    test_app.state.solver_slots.release()
+
+    assert 503 in result_codes
+    # The 503 response body must use the SOLVER_OVERLOADED code.
+
+
+def test_circuit_breaker_opens_after_failures():
+    """Circuit breaker blocks requests after the configured failure threshold."""
+    test_app = create_app()
+    # Force the breaker open by recording failures directly.
+    for _ in range(test_app.state.circuit_breaker.failure_threshold):
+        test_app.state.circuit_breaker.record_failure()
+
+    tc = TestClient(test_app)
+    r = tc.post(
+        "/api/v1/optimization/runs",
+        json={"race_count": 20, "circuit_ids": IDS[:20], "budget_s": 1.0},
+    )
+    assert r.status_code == 503
+    assert r.json()["error"]["code"] == "SOLVER_OVERLOADED"
+
+
+def test_circuit_breaker_recovers_after_cooldown(monkeypatch):
+    """Circuit breaker closes after cooldown and allows the next request."""
+    import time
+
+    monkeypatch.setenv("SOLVER_CIRCUIT_BREAKER_COOLDOWN_S", "10")
+    test_app = create_app()
+    breaker = test_app.state.circuit_breaker
+    current_time = 1000.0
+
+    monkeypatch.setattr(time, "time", lambda: current_time)
+
+    # Open the breaker.
+    for _ in range(breaker.failure_threshold):
+        breaker.record_failure()
+    assert breaker.is_open()
+
+    # Advance time within cooldown window — breaker remains open.
+    current_time += 5.0
+    assert breaker.is_open()
+
+    # Advance time past cooldown — breaker closes on next query.
+    current_time += 6.0
+    assert not breaker.is_open()
+
+
+# ---------------------------------------------------------------------------
+# Stateless startup: no persistence configuration required
+# ---------------------------------------------------------------------------
+
+
+def test_app_starts_without_persistence_configuration():
+    """Application factory serves requests without persistence configuration."""
+    # Must not raise.
+    fresh_app = create_app()
+    tc = TestClient(fresh_app)
+    assert tc.get("/health").status_code == 200
+    assert tc.get("/api/v1/health").status_code == 200
+    assert tc.get("/api/v1/circuits").status_code == 200
+    assert tc.get("/api/v1/seasons/2026/weekends").status_code == 200

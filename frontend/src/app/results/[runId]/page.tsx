@@ -10,9 +10,12 @@ import { ScenarioHeader } from "@/features/builder/ScenarioHeader";
 import { CalendarTimeline } from "@/features/results/CalendarTimeline";
 import { ConstraintDiagnostics } from "@/features/results/ConstraintDiagnostics";
 import { MetricsDashboard } from "@/features/results/MetricsDashboard";
+import { PlanComparison } from "@/features/results/PlanComparison";
 import { RunProvenance } from "@/features/results/RunProvenance";
+import { RunReport } from "@/features/results/RunReport";
 import { TravelLegs } from "@/features/results/TravelLegs";
 import { useRunResult } from "@/features/results/useRunResult";
+import { downloadScheduleCsv, downloadTravelLegsCsv } from "@/features/results/exports";
 import type { HoverTarget } from "@/lib/types";
 
 // Client-only: MapLibre needs window/WebGL.
@@ -28,6 +31,16 @@ export default function ResultsPage({ params }: { params: Promise<{ runId: strin
   const { circuits } = useCircuits();
   const [hovered, setHovered] = useState<HoverTarget>(null);
   const back = () => router.push("/");
+  const download = () => {
+    if (load.state !== "ready") return;
+    const url = URL.createObjectURL(new Blob([JSON.stringify(load.run, null, 2)], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `ecorace-${load.run.run_id}.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const printReport = () => window.print();
 
   if (load.state === "loading") {
     return (
@@ -46,53 +59,88 @@ export default function ResultsPage({ params }: { params: Promise<{ runId: strin
     );
   }
 
-  if (load.state === "missing") {
+  if (load.state === "missing" || load.state === "invalid" || load.state === "storage_unavailable") {
+    const isInvalid = load.state === "invalid";
+    const isStorageBlocked = load.state === "storage_unavailable";
     return (
       <AppShell onBack={back}>
         <PageContainer>
-          <h1 className="font-display text-2xl font-extrabold tracking-tight italic">Result not available</h1>
-          <p className="text-sm text-mute">
-            Run <span className="font-tel">{runId}</span> was not found. This deployment may use temporary storage;
-            results can disappear after a restart. Re-run the optimization to get a fresh result.
-          </p>
+          <div className="flex min-h-[55vh] max-w-xl flex-col justify-center">
+            <h1 className="font-display text-3xl font-medium">Result not available</h1>
+            <p className="mt-3 text-sm leading-6 text-mute">
+              {isStorageBlocked
+                ? "Browser storage is disabled or unavailable, and this result is no longer held in memory."
+                : isInvalid
+                ? `The stored result for this run is corrupted (${load.reason ?? "schema mismatch"}) and cannot be displayed.`
+                : <>
+                    Run <span className="font-tel">{runId}</span> is not available in this browser session.
+                    Results are kept in session storage only and are cleared when the tab is closed.
+                  </>
+              }
+              {" "}Run the optimization again to generate a new result.
+            </p>
+            <button type="button" onClick={back} className="mt-5 self-start rounded-lg bg-rosso px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-rosso-hi">
+              Return to planner
+            </button>
+          </div>
         </PageContainer>
       </AppShell>
     );
   }
 
-  if (load.state === "error") {
-    return (
-      <AppShell onBack={back}>
-        <PageContainer>
-          <h1 className="font-display text-2xl font-extrabold tracking-tight italic">Could not load result</h1>
-          <p role="alert" className="rounded border border-rosso p-2 font-tel text-sm">
-            {load.code}: {load.message}
-          </p>
-        </PageContainer>
-      </AppShell>
-    );
-  }
-
-  const { run, source } = load;
+  const { run } = load;
   return (
-    <AppShell onBack={back}>
-      <PageContainer>
+    <>
+      <div className="screen-only">
+        <AppShell onBack={back}>
+          <PageContainer>
         <ScenarioHeader
-          kicker="EcoRace · Optimization result"
+          kicker="Optimization result"
           title={
             <>
-              Optimized <span className="text-rosso">calendar</span>
+              Optimized {run.season_year} calendar
             </>
           }
-          meta={`${run.run_id} · season ${run.season_year} · ${run.calendar.race_count} races · loaded from ${source === "session" ? "this browser" : "API"}`}
+          meta={
+            <span className="font-tel text-xs text-mute">
+              {run.run_id} · season {run.season_year} · {run.calendar.race_count} races · this browser session
+            </span>
+          }
           badge={
-            <span className="rounded border border-hairline px-2 py-1 font-tel text-xs tracking-widest text-mute uppercase">
-              {run.status}
+            <span className="rounded-md border border-hairline px-3 py-1 font-tel text-xs text-mute">
+              {run.status === "feasible_timeout" ? "Feasible · time limit reached" : run.status === "feasible" ? "Feasible" : run.status.replaceAll("_", " ")}
             </span>
           }
         />
 
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="max-w-2xl text-sm text-mute">
+            This route minimizes estimated great-circle travel distance while meeting the listed calendar and weather constraints.
+            The longest legs and region changes below help judge its practical travel pattern.
+          </p>
+          <details className="relative shrink-0">
+            <summary className="min-h-10 cursor-pointer list-none rounded-lg border border-hairline px-3 py-2 font-tel text-sm hover:bg-lift">
+              Export results <span aria-hidden="true">⌄</span>
+            </summary>
+            <div className="absolute right-0 z-20 mt-2 grid min-w-56 gap-1 rounded-xl border border-hairline bg-card p-2 shadow-2xl">
+              <button type="button" onClick={() => downloadScheduleCsv(run, circuits)} className="rounded-lg px-3 py-2 text-left text-sm hover:bg-lift">
+                Season schedule (CSV)
+              </button>
+              <button type="button" onClick={() => downloadTravelLegsCsv(run, circuits)} className="rounded-lg px-3 py-2 text-left text-sm hover:bg-lift">
+                Travel legs (CSV)
+              </button>
+              <button type="button" onClick={printReport} className="rounded-lg px-3 py-2 text-left text-sm hover:bg-lift">
+                Summary report (PDF)
+              </button>
+              <button type="button" onClick={download} className="rounded-lg px-3 py-2 text-left text-sm hover:bg-lift">
+                Full result (JSON)
+              </button>
+            </div>
+          </details>
+        </div>
+
         <MetricsDashboard run={run} />
+        <PlanComparison run={run} />
 
         <section aria-label="Route map">
           <RouteMap key={run.run_id} run={run} hovered={hovered} />
@@ -105,8 +153,11 @@ export default function ResultsPage({ params }: { params: Promise<{ runId: strin
           <ConstraintDiagnostics run={run} />
         </div>
 
-        <RunProvenance run={run} source={source} />
-      </PageContainer>
-    </AppShell>
+        <RunProvenance run={run} />
+          </PageContainer>
+        </AppShell>
+      </div>
+      <RunReport run={run} />
+    </>
   );
 }

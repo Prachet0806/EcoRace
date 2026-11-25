@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-import os
-
 from ecorace.application import optimization_service as svc
-from ecorace.infrastructure import data_loader, persistence
+from ecorace.infrastructure import data_loader
 from ecorace.interface.http.errors import envelope
 from ecorace.interface.http.schemas import RunRequest
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 try:
     import psutil
@@ -20,14 +16,8 @@ except ImportError:
 
 router = APIRouter(prefix="/api/v1")
 
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=[os.environ.get("RATE_LIMIT_DEFAULT", "60/minute")],
-)
-
 
 @router.get("/health")
-@limiter.limit(os.environ.get("RATE_LIMIT_HEALTH", "120/minute"))
 def health(request: Request) -> dict:
     _, tag = data_loader.circuits_bundle()
     breaker = request.app.state.circuit_breaker
@@ -45,7 +35,6 @@ def health(request: Request) -> dict:
 
 
 @router.get("/circuits")
-@limiter.limit(os.environ.get("RATE_LIMIT_CIRCUITS", "60/minute"))
 def circuits(request: Request) -> dict:
     circuits = data_loader.circuit_list_sorted()
     _, tag = data_loader.circuits_bundle()
@@ -53,8 +42,9 @@ def circuits(request: Request) -> dict:
 
 
 @router.post("/optimization/runs")
-@limiter.limit(os.environ.get("RATE_LIMIT_RUNS", "10/minute"))
-def create_run(body: RunRequest, request: Request) -> dict:
+def create_run(
+    body: RunRequest, request: Request,
+) -> dict:
     breaker = request.app.state.circuit_breaker
     if breaker.is_open():
         return JSONResponse(
@@ -75,10 +65,9 @@ def create_run(body: RunRequest, request: Request) -> dict:
             ),
         )
     try:
-        budget = (
-            body.budget_s
-            if body.budget_s is not None
-            else float(request.app.state.solver_budget_s)
+        budget = min(
+            body.budget_s if body.budget_s is not None else float(request.app.state.solver_budget_s),
+            float(request.app.state.solver_budget_s),
         )
         scenario = svc.create_scenario(
             body.race_count,
@@ -88,7 +77,6 @@ def create_run(body: RunRequest, request: Request) -> dict:
             body.summer_break_start,
             body.summer_break_end,
             body.pin_end_to_dec_week1,
-            persist=False,
         )
         try:
             result = svc.run_optimization(
@@ -102,6 +90,8 @@ def create_run(body: RunRequest, request: Request) -> dict:
                 summer_break_start=body.summer_break_start,
                 summer_break_end=body.summer_break_end,
                 pin_end_to_dec_week1=body.pin_end_to_dec_week1,
+                first_attempt_presolve=request.app.state.solver_first_attempt_presolve,
+                diagnostics_enabled=request.app.state.solver_diagnostics_enabled,
             )
         except svc.AppError as exc:
             if exc.code in ("SOLVER_FAILURE", "SOLVER_TIMEOUT"):
@@ -110,27 +100,15 @@ def create_run(body: RunRequest, request: Request) -> dict:
         except Exception:
             breaker.record_failure()
             raise
-        persistence.save_scenario_and_run(scenario, result)
         breaker.record_success()
         return result
+    except Exception:
+        raise
     finally:
         request.app.state.solver_slots.release()
 
 
-@router.get("/optimization/runs/{run_id}")
-@limiter.limit(os.environ.get("RATE_LIMIT_GET_RUN", "60/minute"))
-def get_run(run_id: str, request: Request) -> dict:
-    result = persistence.get_run(run_id)
-    if result is None:
-        return JSONResponse(
-            status_code=404,
-            content=envelope("RUN_NOT_FOUND", f"Unknown run_id: {run_id}."),
-        )
-    return result
-
-
 @router.get("/seasons/{year}/weekends")
-@limiter.limit(os.environ.get("RATE_LIMIT_WEEKENDS", "60/minute"))
 def season_weekends(year: int, request: Request) -> dict:
     try:
         weekends = data_loader.season(year)
